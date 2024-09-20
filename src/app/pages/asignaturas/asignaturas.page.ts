@@ -12,4 +12,7 @@ export class AsignaturasPage implements OnInit {
   ngOnInit() {
   }
 
+  registrarAsistencia() {
+    
+  }
 }

@@ -27,6 +27,29 @@ export class HomePage implements OnInit {
     },
   ]
 
+  profileMenuButtons = [
+    {
+      text: 'Perfil',
+      icon: 'person-outline',
+      handler: () => {
+        this.router.navigate(['/perfil']);
+      }
+    },
+    {
+      text: 'Cerrar sesión',
+      icon: 'log-out-outline',
+      handler: () => {
+        this.router.navigate(['/login']);
+      }
+    },
+    {
+      text: 'Cancelar',
+      icon: 'close',
+      role: 'cancel'
+    }
+  ];
+  router: any;
+
   constructor() { }
 
   ngOnInit() {

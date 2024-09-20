@@ -1,13 +1,25 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>asignaturas</ion-title>
-  </ion-toolbar>
-</ion-header>
+<app-encabezado titulo="Asignatura"></app-encabezado>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">asignaturas</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content class="ion-padding">
+  <ion-item>
+    <ion-label>
+      <h1>Programación Móvil</h1>
+      <p>Profesor: </p>
+      <p>Sala: </p>
+    </ion-label>
+  </ion-item>
+  <ion-item>
+    <ion-label>
+      <h1>Asistencia</h1>
+      <p>Porcentaje: </p>
+      <p>N° de clases: </p>
+    </ion-label>
+  </ion-item>
+
+<div class="boton-asistencia">
+  <ion-button (click)="registrarAsistencia()" expand="block">
+    Registrar asistencia
+  </ion-button>
+</div>
+
 </ion-content>
