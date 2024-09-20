@@ -48,9 +48,9 @@ export class HomePage implements OnInit {
       role: 'cancel'
     }
   ];
-  router: any;
+  
 
-  constructor() { }
+  constructor(private router : Router) { }
 
   ngOnInit() {
   }

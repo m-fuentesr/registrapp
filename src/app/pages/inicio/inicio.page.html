@@ -1,0 +1,29 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Bienvenida</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="ion-text-center">
+    <ion-text color="primary">
+      <h1>¡Bienvenido a RegistrApp!</h1>
+    </ion-text>
+    <p>Por favor regístrate o inicia sesión para continuar</p>
+  </div>
+
+  <div class="ion-padding">
+    <ion-button expand="block" size="large" color="primary" routerLink="/login">
+      Iniciar Sesión
+      <ion-icon slot="end" name="log-in"></ion-icon>
+    </ion-button>
+    <ion-button expand="block" size="large" fill="outline" class="ion-margin-top" routerLink="/registro">
+      Registrarse
+      <ion-icon slot="end" name="person-add"></ion-icon>
+    </ion-button>
+  </div>
+
+  <div class="ion-text-center">
+    <img src="assets/icon/duoc.png" alt="Imagen duoc" class="duoc">
+  </div>
+</ion-content>
