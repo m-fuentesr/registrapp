@@ -1,13 +1,22 @@
-<ion-header [translucent]="true">
+<ion-header>
   <ion-toolbar>
-    <ion-title>home</ion-title>
+    <ion-icon slot="start" name="menu" class="ion-padding" size="large" ></ion-icon>
+    <ion-title class="ion-text-capitalize">RegistrApp</ion-title>
+    <ion-icon slot="end" name="person" class="ion-padding" size="large" ></ion-icon>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">home</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content class="ion-padding">
+  <ion-text color="primary" class="ion-text-center">
+    <h1>Lista de asignaturas</h1>
+  </ion-text>
+<ion-list [inset]="true" lines="none" mode="ios">
+  
+  <ion-item routerLink="{{item.ruta}}" detail="true" *ngFor="let item of elementos" >
+    <ion-icon name="{{item.icono}}" slot="start"></ion-icon>
+    <ion-label>{{item.etiqueta}}</ion-label>
+  </ion-item>
+
+</ion-list>
+
 </ion-content>
