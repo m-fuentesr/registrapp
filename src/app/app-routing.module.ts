@@ -31,14 +31,20 @@ const routes: Routes = [
   {
     path: 'login',
     loadChildren: () => import('./pages/login/login.module').then( m => m.LoginPageModule)
-  },  {
+  },
+  {
     path: 'registro',
     loadChildren: () => import('./pages/registro/registro.module').then( m => m.RegistroPageModule)
   },
   {
     path: 'registrar-asistencia',
     loadChildren: () => import('./pages/registrar-asistencia/registrar-asistencia.module').then( m => m.RegistrarAsistenciaPageModule)
+  },  {
+    path: 'apuntes',
+    loadChildren: () => import('./pages/apuntes/apuntes.module').then( m => m.ApuntesPageModule)
   },
+
+
 
 
 

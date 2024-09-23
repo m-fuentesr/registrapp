@@ -4,6 +4,12 @@
       <ion-back-button defaultHref="home" text="Volver" mode="ios"></ion-back-button>
     </ion-buttons>
     <ion-title class="ion-text-capitalize">{{titulo}}</ion-title>
-    <ion-icon slot="end" name="person" class="ion-padding" size="large" color="primary"></ion-icon>
+    <ion-buttons slot="end">
+      <ion-button (click)="mostrarMenu()">
+        <ion-icon name="person" size="large" color="primary"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
+  <ion-action-sheet id="actionSheet" backdropDismiss="false" [buttons]="profileMenuButtons" mode="ios"></ion-action-sheet>
 </ion-header>
+

@@ -1,0 +1,28 @@
+<app-encabezado titulo="Mis apuntes"></app-encabezado>
+
+<ion-content class="ion-padding">
+  <ion-item>
+    <ion-label position="floating">Título</ion-label>
+    <ion-input [(ngModel)]="nuevoApunte.titulo"></ion-input>
+  </ion-item>
+  <ion-item>
+    <ion-label position="floating">Contenido</ion-label>
+    <ion-textarea [(ngModel)]="nuevoApunte.contenido"></ion-textarea>
+  </ion-item>
+  
+  <ion-button expand="full" color="primary" (click)="agregarApunte()">
+    Agregar Apunte
+  </ion-button>
+
+  <ion-list>
+    <ion-item *ngFor="let apunte of apuntes">
+      <ion-label>
+        <h2>{{ apunte.titulo }}</h2>
+        <p>{{ apunte.contenido }}</p>
+      </ion-label>
+      <ion-button color="danger" slot="end" (click)="eliminarApunte(apunte.id)">
+        Eliminar
+      </ion-button>
+    </ion-item>
+  </ion-list>
+</ion-content>
