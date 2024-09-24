@@ -1,0 +1,32 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/inicio" text="Volver" mode="ios"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Iniciar sesión</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="ion-text-center">
+    <ion-text>
+      <h2>Seleccione una opción:</h2>
+    </ion-text>
+  </div>
+
+  <div class="ion-padding">
+    <ion-button expand="block" size="large" color="primary" routerLink="/login">
+      Iniciar Sesión como alumno
+      <ion-icon slot="end" name="log-in"></ion-icon>
+    </ion-button>
+    <ion-button expand="block" size="large" color="primary" routerLink="/login-docente" class="ion-margin-top">
+      Iniciar Sesión como docente
+      <ion-icon slot="end" name="log-in"></ion-icon>
+    </ion-button>
+  </div>
+
+  <div class="ion-text-center">
+    <img src="assets/icon/duoc.png" alt="Imagen duoc" class="duoc">
+  </div>
+</ion-content>
+

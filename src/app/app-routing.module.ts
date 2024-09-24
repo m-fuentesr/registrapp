@@ -39,9 +39,30 @@ const routes: Routes = [
   {
     path: 'registrar-asistencia',
     loadChildren: () => import('./pages/registrar-asistencia/registrar-asistencia.module').then( m => m.RegistrarAsistenciaPageModule)
-  },  {
+  },
+  {
     path: 'apuntes',
     loadChildren: () => import('./pages/apuntes/apuntes.module').then( m => m.ApuntesPageModule)
+  },
+  {
+    path: 'login-docente',
+    loadChildren: () => import('./pages/login-docente/login-docente.module').then( m => m.LoginDocentePageModule)
+  },
+  {
+    path: 'seleccionar-login',
+    loadChildren: () => import('./pages/seleccionar-login/seleccionar-login.module').then( m => m.SeleccionarLoginPageModule)
+  },
+  {
+    path: 'home-docente',
+    loadChildren: () => import('./pages/home-docente/home-docente.module').then( m => m.HomeDocentePageModule)
+  },
+  {
+    path: 'perfil-docente',
+    loadChildren: () => import('./pages/perfil-docente/perfil-docente.module').then( m => m.PerfilDocentePageModule)
+  },
+  {
+    path: 'asignaturas-docente',
+    loadChildren: () => import('./pages/asignaturas-docente/asignaturas-docente.module').then( m => m.AsignaturasDocentePageModule)
   },
 
 

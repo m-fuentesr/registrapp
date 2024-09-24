@@ -22,7 +22,7 @@ export class EncabezadoComponent implements OnInit {
       text: 'Cerrar sesión',
       icon: 'log-out-outline',
       handler: () => {
-        this.router.navigate(['/login']);
+        this.router.navigate(['/inicio']);
       }
     },
     {

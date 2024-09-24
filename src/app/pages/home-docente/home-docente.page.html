@@ -1,0 +1,35 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-menu-button slot="start" color="primary"></ion-menu-button>
+    <ion-title class="ion-text-capitalize">RegistrApp</ion-title>
+    <ion-button slot="end" fill="clear" id="perfilMenu">
+      <ion-icon name="person" size="large" color="primary"></ion-icon>
+    </ion-button>
+  </ion-toolbar>
+</ion-header>
+
+<ion-router-outlet id="main-content"></ion-router-outlet>
+
+<ion-action-sheet trigger="perfilMenu" backdropDismiss="false" [buttons]="profileMenuButtons" mode="ios"></ion-action-sheet>
+
+<ion-content class="ion-padding">
+  <ion-text color="primary" class="ion-text-center">
+    <h1>Lista de asignaturas</h1>
+  </ion-text>
+
+  <ion-accordion-group expand="inset" lines="none" mode="ios">
+    <ion-accordion *ngFor="let item of elementos">
+      <ion-item slot="header" detail="false">
+        <ion-icon name="{{item.icono}}" slot="start"></ion-icon>
+        <ion-label>{{item.etiqueta}}</ion-label>
+      </ion-item>
+      <ion-list slot="content">
+        <ion-item *ngFor="let seccion of item.secciones" (click)="navegarASeccion(item.ruta, seccion)">
+          <ion-label>{{seccion}}</ion-label>
+        </ion-item>
+      </ion-list>
+    </ion-accordion>
+  </ion-accordion-group>
+
+</ion-content>
+

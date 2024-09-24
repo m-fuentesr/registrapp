@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { AlertController } from '@ionic/angular';
 import { Geolocation } from '@capacitor/geolocation';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-registrar-asistencia',
@@ -9,7 +10,7 @@ import { Geolocation } from '@capacitor/geolocation';
 })
 export class RegistrarAsistenciaPage implements OnInit {
 
-  constructor(private alertController: AlertController) { }
+  constructor(private alertController: AlertController, private router: Router) { }
 
   ngOnInit() {
   }
@@ -27,7 +28,14 @@ export class RegistrarAsistenciaPage implements OnInit {
     const alert = await this.alertController.create({
       header: '¡Asistencia confirmada!',
       message: mensaje,
-      buttons: ['OK']
+      buttons: [
+        {
+          text: 'OK',
+          handler: () => {
+            this.router.navigate(['/asignaturas']);
+          }
+        }
+      ]
     });
 
     await alert.present();
