@@ -1,0 +1,27 @@
+<app-encabezado titulo="Clase Actual"></app-encabezado>
+
+<ion-content class="ion-padding">
+  <ion-item-divider>
+    <ion-label>
+      <strong>Alumnos Presentes</strong>
+    </ion-label>
+  </ion-item-divider>
+
+  <ion-list>
+    <ion-item *ngFor="let alumno of alumnosPresentes">
+      <ion-label>
+        <h2>{{ alumno.nombre }}</h2>
+        <p *ngIf="alumno.presente; else ausente">Está presente.</p>
+        <ng-template #ausente>
+          <p>No está presente.</p>
+        </ng-template>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+
+  <ion-item *ngIf="alumnosPresentes.length === 0">
+    <ion-label>
+      <h2>No hay alumnos presentes en la clase.</h2>
+    </ion-label>
+  </ion-item>
+</ion-content>

@@ -63,7 +63,19 @@ const routes: Routes = [
   {
     path: 'asignaturas-docente',
     loadChildren: () => import('./pages/asignaturas-docente/asignaturas-docente.module').then( m => m.AsignaturasDocentePageModule)
+  },  {
+    path: 'recuperar-password',
+    loadChildren: () => import('./pages/recuperar-password/recuperar-password.module').then( m => m.RecuperarPasswordPageModule)
   },
+  {
+    path: 'modificar-password',
+    loadChildren: () => import('./pages/modificar-password/modificar-password.module').then( m => m.ModificarPasswordPageModule)
+  },
+  {
+    path: 'clase-actual',
+    loadChildren: () => import('./pages/clase-actual/clase-actual.module').then( m => m.ClaseActualPageModule)
+  },
+
 
 
 

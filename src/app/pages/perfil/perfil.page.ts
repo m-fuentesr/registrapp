@@ -1,15 +1,19 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AlertController } from '@ionic/angular';
 
 @Component({
   selector: 'app-perfil',
   templateUrl: './perfil.page.html',
   styleUrls: ['./perfil.page.scss'],
 })
-export class PerfilPage implements OnInit {
+export class PerfilPage {
 
-  constructor() { }
+  constructor(private router: Router, private alertController: AlertController) {}
 
-  ngOnInit() {
+
+  modificarPassword() {
+
+    this.router.navigate(['/modificar-password']); 
   }
-
 }

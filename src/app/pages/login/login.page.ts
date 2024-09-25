@@ -28,6 +28,10 @@ export class LoginPage implements OnInit{
       console.log("Pa la casa!!!");
     } */
 
+    recuperarPassword() {
+      this.router.navigate(['/recuperar-password']);
+      }
+
   }
 
 // }
