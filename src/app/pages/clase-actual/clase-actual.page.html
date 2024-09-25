@@ -11,9 +11,9 @@
     <ion-item *ngFor="let alumno of alumnosPresentes">
       <ion-label>
         <h2>{{ alumno.nombre }}</h2>
-        <p *ngIf="alumno.presente; else ausente">Está presente.</p>
+        <p *ngIf="alumno.presente; else ausente">Presente.</p>
         <ng-template #ausente>
-          <p>No está presente.</p>
+          <p>Ausente.</p>
         </ng-template>
       </ion-label>
     </ion-item>
