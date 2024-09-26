@@ -12,4 +12,10 @@ export class AsistenciaPage implements OnInit {
   ngOnInit() {
   }
 
+  asignaturas = [
+    { nombre: 'Programación Móvil', porcentajeAsistencia: 100, clasesAsistidas: 20 },
+    { nombre: 'Arquitectura de Software', porcentajeAsistencia: 100, clasesAsistidas: 20 },
+    { nombre: 'Estadística', porcentajeAsistencia: 50, clasesAsistidas: 10 },
+  ];
+
 }

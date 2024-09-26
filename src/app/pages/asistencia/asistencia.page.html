@@ -1,13 +1,15 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>asistencia</ion-title>
-  </ion-toolbar>
-</ion-header>
+<app-encabezado titulo="Asignatura"></app-encabezado>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">asistencia</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content class="ion-padding">
+
+  <ion-list>
+    <ion-item *ngFor="let asignatura of asignaturas">
+      <ion-label>
+        <h2>{{asignatura.nombre}}</h2>
+        <p>Porcentaje de asistencia: {{asignatura.porcentajeAsistencia}}%</p>
+        <p>Asistió a {{asignatura.clasesAsistidas}} de 20 clases</p>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+
 </ion-content>
