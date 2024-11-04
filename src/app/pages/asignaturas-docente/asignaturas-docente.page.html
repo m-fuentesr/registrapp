@@ -32,6 +32,15 @@
     </ion-item>
   </ion-list>
 
+  <ion-button expand="block" color="primary" (click)="generarCodigoQR()">
+    Generar Código QR
+  </ion-button>
+
+  <div *ngIf="qrCodeUrl" class="ion-text-center ion-margin-top">
+    <img [src]="qrCodeUrl" alt="Código QR" />
+    <p>Escanee este código para marcar asistencia.</p>
+  </div>
+
   <ion-button expand="block" routerLink="/clase-actual" fill="solid" color="primary">
     Ver Clase Actual
   </ion-button>

@@ -21,6 +21,21 @@
 
   <ion-list>
     <form #miForm="ngForm" (ngSubmit)="registrarUsuario()">
+
+      <ion-item>
+        <ion-label>Tipo de usuario</ion-label>
+        <ion-radio-group [(ngModel)]="usr.tipo" name="tipousuario" required>
+          <ion-item>
+            <ion-label style="margin-right: 14px;">Alumno</ion-label>
+            <ion-radio value="alumno"></ion-radio>
+          </ion-item>
+          <ion-item>
+            <ion-label style="margin-right: 10px;">Docente</ion-label>
+            <ion-radio value="docente"></ion-radio>
+          </ion-item>
+        </ion-radio-group>
+      </ion-item>
+
       <ion-item>
         <ion-input label="Nombre" type="text" required labelPlacement="floating" name="usr.firstName" [(ngModel)]="usr.firstName" placeholder="Ingrese su nombre"></ion-input>
         <ion-icon name="person"></ion-icon>
