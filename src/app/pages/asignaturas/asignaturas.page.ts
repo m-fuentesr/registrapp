@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
 import { Barcode, BarcodeScanner, ScanResult } from '@capacitor-mlkit/barcode-scanning';
+import { AlertController } from '@ionic/angular';
 
 
 @Component({
@@ -14,7 +14,7 @@ export class AsignaturasPage implements OnInit {
   barcodes: Barcode[] = [];
   isScanning: boolean = false;
 
-  constructor(private router: Router) { }
+  constructor(private alertController: AlertController) { }
 
   ngOnInit() {
     this.checkBarcodeScannerSupport(); // Verifica el soporte del escáner de códigos de barras
@@ -32,6 +32,7 @@ export class AsignaturasPage implements OnInit {
   async registrarAsistencia(): Promise<void> {
     const granted = await this.requestPermissions(); // Solicita permisos de cámara
     if (!granted) {
+      this.presentAlert();
       return; 
     }
   
@@ -49,5 +50,14 @@ export class AsignaturasPage implements OnInit {
   async requestPermissions(): Promise<boolean> {
     const { camera } = await BarcodeScanner.requestPermissions(); // Solicita permisos de cámara
     return camera === 'granted' || camera === 'limited';
+  }
+
+  async presentAlert(): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Permiso denegado',
+      message: 'Para usar la aplicación debe autorizar los permisos de cámara',
+      buttons: ['OK'],
+    });
+    await alert.present();
   }
 }
