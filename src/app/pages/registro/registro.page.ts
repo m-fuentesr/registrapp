@@ -30,6 +30,8 @@ export class RegistroPage {
         // Guarda los datos del usuario en el storage
         await this.dbstorage.saveUser(this.usr);
         console.log('Registro exitoso para:', this.usr.firstName, this.usr.lastName, this.usr.email);
+
+        // Redirige a la página de inicio de sesión después del registro
         this.router.navigate(['/login']);
       } catch (error) {
         console.error('Error al guardar el usuario:', error);
