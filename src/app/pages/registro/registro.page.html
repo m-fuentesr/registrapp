@@ -51,10 +51,6 @@
         <ion-icon name="mail"></ion-icon>
       </ion-item>
 
-      <ion-text color="danger" *ngIf="emailField.invalid && emailField.touched">
-        <p>Por favor, ingrese un correo electrónico válido.</p>
-      </ion-text>
-
       <ion-item>
         <ion-input label="Contraseña" type="password" required labelPlacement="floating" name="usr.password" [(ngModel)]="usr.password" placeholder="Ingrese contraseña"></ion-input>
         <ion-icon name="lock-closed"></ion-icon>
@@ -72,6 +68,7 @@
 
     </form>
   </ion-list>
+
   <div *ngIf="!passwordsMatch">
     <ion-text color="danger">
       <p>Las contraseñas no coinciden. Por favor, inténtelo de nuevo.</p>

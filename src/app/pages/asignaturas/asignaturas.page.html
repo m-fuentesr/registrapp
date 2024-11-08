@@ -4,22 +4,22 @@
   <ion-item>
     <ion-label>
       <h1>Programación Móvil</h1>
-      <p>Profesor: </p>
-      <p>Sala: </p>
+      <p>Profesor: Nombre del Profesor</p>
+      <p>Sala: Número de Sala</p>
     </ion-label>
   </ion-item>
-  <ion-item>
+
+  <ion-item *ngIf="asistenciaConfirmada">
     <ion-label>
-      <h1>Asistencia</h1>
-      <p>Porcentaje: </p>
-      <p>N° de clases: </p>
+      <h1>Asistencia Confirmada</h1>
+      <p>Fecha y hora: {{ fechaHoraActual }}</p>
+      <p>Ubicación: Latitud {{ latitud }}, Longitud {{ longitud }}</p>
     </ion-label>
   </ion-item>
 
-<div class="boton-asistencia">
-  <ion-button (click)="registrarAsistencia()" expand="block">
-    Registrar asistencia
-  </ion-button>
-</div>
-
+  <div class="boton-asistencia">
+    <ion-button (click)="registrarAsistencia()" expand="block"> <!--[disabled]="isScanning"-->
+      Registrar asistencia
+    </ion-button>
+  </div>
 </ion-content>
