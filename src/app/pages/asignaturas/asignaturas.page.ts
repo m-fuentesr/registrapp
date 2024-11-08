@@ -34,23 +34,30 @@ export class AsignaturasPage implements OnInit {
   }
 
   async registrarAsistencia(): Promise<void> {
-    const granted = await this.requestPermissions(); // Solicita permisos de cámara
-    if (!granted) {
-      this.presentAlert('Permiso denegado', 'Para usar la aplicación debe autorizar los permisos de cámara');
-      return;
+    try {
+        const granted = await this.requestPermissions(); // Solicita permisos de cámara
+        if (!granted) {
+            await this.presentAlert('Permiso denegado', 'Para usar la aplicación debe autorizar los permisos de cámara.');
+            return;
+        }
+
+        this.isScanning = true; 
+        const { barcodes } = await BarcodeScanner.scan(); // Escanea los códigos de barras
+        this.barcodes.push(...barcodes); // Agrega los códigos escaneados al array
+
+        // Confirmar asistencia si se escaneó exitosamente
+        if (this.barcodes.length > 0) {
+            await this.confirmarAsistencia();
+        } else {
+            await this.presentAlert('Error', 'No se detectó ningún código QR válido.');
+        }
+    } catch (error) {
+        await this.presentAlert('Error', 'Ocurrió un error durante el escaneo.');
+    } finally {
+        this.isScanning = false; // Finaliza el escaneo
     }
-
-    this.isScanning = true; 
-    const { barcodes } = await BarcodeScanner.scan(); // Escanea los códigos de barras
-    this.barcodes.push(...barcodes); // Agrega los códigos escaneados al array
-
-    // Confirmar asistencia si se escaneó exitosamente
-    if (this.barcodes.length > 0) {
-      await this.confirmarAsistencia();
-    }
-
-    this.isScanning = false; // Finaliza el escaneo
   }
+
 
   async requestPermissions(): Promise<boolean> {
     const { camera } = await BarcodeScanner.requestPermissions(); // Solicita permisos de cámara
@@ -58,18 +65,27 @@ export class AsignaturasPage implements OnInit {
   }
 
   async confirmarAsistencia(): Promise<void> {
+  
     // Obtener fecha y hora actuales
     this.fechaHoraActual = new Date().toLocaleString();
-
-    // Obtener ubicación actual
-    const posicion = await Geolocation.getCurrentPosition();
-    this.latitud = posicion.coords.latitude;
-    this.longitud = posicion.coords.longitude;
-
+  
+    try {
+      // Obtener ubicación actual
+      const posicion = await Geolocation.getCurrentPosition();
+      this.latitud = posicion.coords.latitude;
+      this.longitud = posicion.coords.longitude;
+  
+    } catch (error) {
+      await this.presentAlert('Error de ubicación', 'No se pudo obtener la ubicación.');
+      return;
+    }
+  
+    // Actualiza el estado de confirmación
     this.asistenciaConfirmada = true;
-
+  
     // Mostrar alerta de confirmación de asistencia
     const mensaje = `Fecha y hora: ${this.fechaHoraActual}\nUbicación: Latitud ${this.latitud}, Longitud ${this.longitud}`;
+  
     await this.presentAlert('¡Asistencia confirmada!', mensaje);
   }
 
