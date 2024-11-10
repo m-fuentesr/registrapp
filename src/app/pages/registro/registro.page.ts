@@ -58,14 +58,4 @@ export class RegistroPage {
     }
   }
 
-
-  async pruebaConexionFirestore() {
-    try {
-      const docRef = this.firestore.collection('prueba').doc('testDoc');
-      await docRef.set({ mensaje: 'Conexión exitosa' });
-      console.log('Conexión a Firestore exitosa');
-    } catch (error) {
-      console.error('Error en la conexión a Firestore:', error);
-    }
-  }
 }

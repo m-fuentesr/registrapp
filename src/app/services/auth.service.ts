@@ -44,6 +44,12 @@ export class AuthService {
     }
   }
 
+  // Método para verificar si el usuario está autenticado
+  async isAuthenticated(): Promise<boolean> {
+    const user = await this.afAuth.currentUser;
+    return !!user;
+  }
+
   // Método para cerrar sesión
   async logout() {
     await this.afAuth.signOut();
