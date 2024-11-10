@@ -2,8 +2,8 @@ import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { Usuario } from 'src/app/interfaces/usuario';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
-import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { StorageService } from 'src/app/services/dbstorage.service';
+import { AuthService } from 'src/app/services/auth.service';
 
 @Component({
   selector: 'app-registro',
@@ -25,7 +25,7 @@ export class RegistroPage {
   constructor(
     private router: Router,
     private dbstorage: StorageService,
-    private afAuth: AngularFireAuth,
+    private authService: AuthService,
     private firestore: AngularFirestore
   ) {}
 
@@ -34,19 +34,15 @@ export class RegistroPage {
 
     if (this.passwordsMatch) {
       try {
-        // Crear el usuario en Firebase Authentication
-        const userCredential = await this.afAuth.createUserWithEmailAndPassword(
-          this.usr.email,
-          this.usr.password
-        );
-
-        // Guardar datos adicionales en Firestore
-        await this.firestore.collection('usuarios').doc(userCredential.user?.uid).set({
+        const userData = {
           firstName: this.usr.firstName,
           lastName: this.usr.lastName,
           email: this.usr.email,
           tipo: this.usr.tipo,
-        });
+        };
+
+        // Llamar a 'register' en el servicio
+        await this.authService.register(this.usr.email, this.usr.password, userData);
 
         // Guarda los datos del usuario en el storage
         await this.dbstorage.saveUser(this.usr);
@@ -59,6 +55,17 @@ export class RegistroPage {
       }
     } else {
       console.log('Las contraseñas no coinciden');
+    }
+  }
+
+
+  async pruebaConexionFirestore() {
+    try {
+      const docRef = this.firestore.collection('prueba').doc('testDoc');
+      await docRef.set({ mensaje: 'Conexión exitosa' });
+      console.log('Conexión a Firestore exitosa');
+    } catch (error) {
+      console.error('Error en la conexión a Firestore:', error);
     }
   }
 }

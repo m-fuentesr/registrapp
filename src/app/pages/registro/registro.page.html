@@ -69,6 +69,10 @@
     </form>
   </ion-list>
 
+  <button (click)="pruebaConexionFirestore()">Probar Conexión a Firestore</button>
+
+
+
   <div *ngIf="!passwordsMatch">
     <ion-text color="danger">
       <p>Las contraseñas no coinciden. Por favor, inténtelo de nuevo.</p>

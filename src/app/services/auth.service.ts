@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
+import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { AlertController } from '@ionic/angular';
 
 @Injectable({
@@ -7,14 +8,24 @@ import { AlertController } from '@ionic/angular';
 })
 export class AuthService {
 
-  constructor(private afAuth: AngularFireAuth, private alertController: AlertController) { }
+  constructor(
+    private afAuth: AngularFireAuth, 
+    private alertController: AlertController,
+    private firestore: AngularFirestore) { }
 
   // Método para registrar usuarios
-  async register(email: string, password: string) {
+  async register(email: string, password: string, userData: any) {
     try {
       const userCredential = await this.afAuth.createUserWithEmailAndPassword(email, password);
-      console.log('Usuario registrado:', userCredential.user);
-      return userCredential.user;
+      const user = userCredential.user;
+
+      // Guarda datos adicionales en Firestore
+      if (user) {
+        await this.firestore.collection('usuarios').doc(user.uid).set(userData);
+      }
+
+      console.log('Usuario registrado y guardado:', user);
+      return user;
     } catch (error) {
       console.error('Error en registro:', error);
       throw error;
