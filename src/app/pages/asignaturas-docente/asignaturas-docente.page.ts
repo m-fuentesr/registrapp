@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import * as QRCode from 'qrcode';
+import { AngularFirestore } from '@angular/fire/compat/firestore';
 
 @Component({
   selector: 'app-asignaturas-docente',
@@ -8,25 +9,26 @@ import * as QRCode from 'qrcode';
 })
 export class AsignaturasDocentePage implements OnInit {
 
-  alumnos = [
-    { nombre: 'Matías Fuentes', porcentajeAsistencia: 100, clasesAsistidas: 20 },
-    { nombre: 'Sebastián Monjes', porcentajeAsistencia: 100, clasesAsistidas: 20 },
-    { nombre: 'Ignacio Sorko', porcentajeAsistencia: 50, clasesAsistidas: 10 },
-  ];
+  alumnos: any[] = [];
+  qrCodeUrl: string = '';
 
-  constructor() { }
+  constructor(private firestore: AngularFirestore) {}
 
   ngOnInit() {
+    this.obtenerAlumnos();
   }
 
-  qrCodeUrl: string = '';
+  async obtenerAlumnos() {
+    this.firestore.collection('asistencia').valueChanges().subscribe((data: any) => {
+      this.alumnos = data;
+    });
+  }
 
   generarCodigoQR() {
     const datosClase = { 
       clase: 'Programación Móvil', 
       fecha: new Date().toISOString() 
     };
-    
     QRCode.toDataURL(JSON.stringify(datosClase))
       .then(url => {
         this.qrCodeUrl = url;
@@ -36,5 +38,4 @@ export class AsignaturasDocentePage implements OnInit {
         console.error('Error generando el código QR:', err);
       });
   }
-
 }
