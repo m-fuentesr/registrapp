@@ -46,11 +46,12 @@ export class AsignaturasPage implements OnInit {
         return;
       }
 
-      this.isScanning = true; 
+      this.isScanning = true;
       const { barcodes } = await BarcodeScanner.scan();
       this.barcodes.push(...barcodes);
 
-      if (this.barcodes.length > 0) {
+      if (this.barcodes.length > 0 && this.barcodes[0].displayValue) {
+        console.log("Código QR escaneado:", this.barcodes[0].displayValue);
         const alumnoData = JSON.parse(this.barcodes[0].displayValue);
         await this.confirmarAsistencia(alumnoData);
         this.router.navigate(['/asignaturas-docente']);
@@ -70,31 +71,39 @@ export class AsignaturasPage implements OnInit {
   }
 
   async confirmarAsistencia(alumnoData: any): Promise<void> {
+
     this.fechaHoraActual = new Date().toLocaleString();
     try {
-        const posicion = await Geolocation.getCurrentPosition();
-        this.latitud = posicion.coords.latitude;
-        this.longitud = posicion.coords.longitude;
-
-        const alumnoRef = this.firestore.collection('asistencia').doc(alumnoData.nombre);
-        const doc = await alumnoRef.get().toPromise();
-
-        if (doc?.exists) {
-            const data = doc.data() as { clasesAsistidas: number; porcentajeAsistencia: number };
-            const clasesAsistidas = (data?.clasesAsistidas ?? 0) + 1;
-            const porcentajeAsistencia = (clasesAsistidas / 20) * 100;
-
-            await alumnoRef.update({ clasesAsistidas, porcentajeAsistencia });
-        } else {
-            await alumnoRef.set({
-                nombre: alumnoData.nombre,
-                clasesAsistidas: 1,
-                porcentajeAsistencia: 5,
-            });
-        }
-    } catch (error) {
-        await this.presentAlert('Error de ubicación', 'No se pudo obtener la ubicación.');
+      // Solicitar permisos antes de intentar obtener la ubicación
+      const permission = await Geolocation.requestPermissions();
+      if (permission.location !== 'granted') {
+        // Si no se otorgan permisos, muestra una alerta
+        await this.presentAlert('Error de ubicación', 'No se otorgaron permisos para acceder a la ubicación.');
         return;
+      }
+      const posicion = await Geolocation.getCurrentPosition();
+      this.latitud = posicion.coords.latitude;
+      this.longitud = posicion.coords.longitude;
+
+      const alumnoRef = this.firestore.collection('asistencia').doc(alumnoData.nombre);
+      const doc = await alumnoRef.get().toPromise();
+
+      if (doc?.exists) {
+        const data = doc.data() as { clasesAsistidas: number; porcentajeAsistencia: number };
+        const clasesAsistidas = (data?.clasesAsistidas ?? 0) + 1;
+        const porcentajeAsistencia = (clasesAsistidas / 20) * 100;
+
+        await alumnoRef.update({ clasesAsistidas, porcentajeAsistencia });
+      } else {
+        await alumnoRef.set({
+          nombre: alumnoData.nombre,
+          clasesAsistidas: 1,
+          porcentajeAsistencia: 5,
+        });
+      }
+    } catch (error) {
+      await this.presentAlert('Error de ubicación', 'No se pudo obtener la ubicación.');
+      return;
     }
 
     this.asistenciaConfirmada = true;

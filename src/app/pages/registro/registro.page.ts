@@ -48,8 +48,12 @@ export class RegistroPage {
         await this.dbstorage.saveUser(this.usr);
         console.log('Registro exitoso para:', this.usr.firstName, this.usr.lastName, this.usr.email);
 
-        // Redirige a la página de inicio de sesión después del registro
-        this.router.navigate(['/login']);
+        // Redirige al login correspondiente
+        if (this.usr.tipo === 'alumno') {
+          this.router.navigate(['/login']);
+        } else if (this.usr.tipo === 'docente') {
+          this.router.navigate(['/login-docente']);
+        }
       } catch (error) {
         console.error('Error al guardar el usuario:', error);
       }

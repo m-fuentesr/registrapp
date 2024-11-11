@@ -26,6 +26,7 @@ export class AsignaturasDocentePage implements OnInit {
 
   generarCodigoQR() {
     const datosClase = { 
+      nombre: 'a',
       clase: 'Programación Móvil', 
       fecha: new Date().toISOString() 
     };
