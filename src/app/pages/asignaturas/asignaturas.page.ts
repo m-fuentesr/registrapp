@@ -3,6 +3,7 @@ import { Barcode, BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { AlertController } from '@ionic/angular';
 import { Geolocation } from '@capacitor/geolocation';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
+import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { Router } from '@angular/router';
 
 @Component({
@@ -19,15 +20,18 @@ export class AsignaturasPage implements OnInit {
   fechaHoraActual: string = '';
   latitud: number | null = null;
   longitud: number | null = null;
+  nombreAlumno: string = '';
 
   constructor(
     private alertController: AlertController,
     private firestore: AngularFirestore,
+    private afAuth: AngularFireAuth,
     private router: Router
   ) { }
 
   ngOnInit() {
     this.checkBarcodeScannerSupport();
+    this.obtenerNombreAlumno();
   }
 
   async checkBarcodeScannerSupport() {
@@ -35,6 +39,16 @@ export class AsignaturasPage implements OnInit {
     this.isSupported = result.supported;
     if (this.isSupported) {
       await BarcodeScanner.installGoogleBarcodeScannerModule();
+    }
+  }
+
+  async obtenerNombreAlumno() {
+    const user = await this.afAuth.currentUser;
+    if (user) {
+      const userId = user.uid;
+      this.firestore.collection('alumnos').doc(userId).valueChanges().subscribe((data: any) => {
+        this.nombreAlumno = data?.nombre || 'Alumno Desconocido';
+      });
     }
   }
 
@@ -52,9 +66,8 @@ export class AsignaturasPage implements OnInit {
 
       if (this.barcodes.length > 0 && this.barcodes[0].displayValue) {
         console.log("Código QR escaneado:", this.barcodes[0].displayValue);
-        const alumnoData = JSON.parse(this.barcodes[0].displayValue);
-        await this.confirmarAsistencia(alumnoData);
-        this.router.navigate(['/asignaturas-docente']);
+        const datosClase = JSON.parse(this.barcodes[0].displayValue);
+        await this.confirmarAsistencia(datosClase);
       } else {
         await this.presentAlert('Error', 'No se detectó ningún código QR válido.');
       }
@@ -70,7 +83,7 @@ export class AsignaturasPage implements OnInit {
     return camera === 'granted' || camera === 'limited';
   }
 
-  async confirmarAsistencia(alumnoData: any): Promise<void> {
+  async confirmarAsistencia(datosClase: any): Promise<void> {
 
     this.fechaHoraActual = new Date().toLocaleString();
     try {
@@ -85,20 +98,22 @@ export class AsignaturasPage implements OnInit {
       this.latitud = posicion.coords.latitude;
       this.longitud = posicion.coords.longitude;
 
-      const alumnoRef = this.firestore.collection('asistencia').doc(alumnoData.nombre);
+      const alumnoRef = this.firestore.collection('asistencia').doc(this.nombreAlumno);
       const doc = await alumnoRef.get().toPromise();
 
       if (doc?.exists) {
         const data = doc.data() as { clasesAsistidas: number; porcentajeAsistencia: number };
         const clasesAsistidas = (data?.clasesAsistidas ?? 0) + 1;
-        const porcentajeAsistencia = (clasesAsistidas / 20) * 100;
+        const porcentajeAsistencia = (clasesAsistidas / 5) * 100;
 
         await alumnoRef.update({ clasesAsistidas, porcentajeAsistencia });
       } else {
         await alumnoRef.set({
-          nombre: alumnoData.nombre,
+          nombre: this.nombreAlumno,
           clasesAsistidas: 1,
           porcentajeAsistencia: 5,
+          clase: datosClase.clase,
+          fecha: datosClase.fecha,
         });
       }
     } catch (error) {

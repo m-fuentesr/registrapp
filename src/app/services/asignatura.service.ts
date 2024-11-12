@@ -1,4 +1,4 @@
-import { Asignatura } from './../interfaces/asignatura';
+import { Asignatura, Seccion, Clase } from './../interfaces/asignatura';
 import { Injectable } from '@angular/core';
 import { Storage } from '@ionic/storage-angular';
 
@@ -28,4 +28,5 @@ export class AsignaturaService {
     this.asignaturas = datos || [];
     return this.asignaturas;
   }
+
 }

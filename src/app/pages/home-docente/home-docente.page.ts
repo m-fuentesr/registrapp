@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { MenuItem } from '../../interfaces/menu-item';
 import { Router } from '@angular/router';
+import { AngularFirestore } from '@angular/fire/compat/firestore';
+import { AngularFireAuth } from '@angular/fire/compat/auth';
 
 @Component({
   selector: 'app-home-docente',
@@ -9,26 +11,7 @@ import { Router } from '@angular/router';
 })
 export class HomeDocentePage implements OnInit {
 
-  elementos: MenuItem[] = [
-    {
-      ruta: '/asignaturas-docente',
-      icono: 'phone-portrait-outline',
-      etiqueta: 'Programación Móvil',
-      secciones: ['Sección 001-D', 'Sección 002-D', 'Sección 003-D']
-    },
-    {
-      ruta: '/asignaturas-docente',
-      icono: 'laptop-outline',
-      etiqueta: 'Arquitectura de Software',
-      secciones: ['Sección 001-D', 'Sección 002-D']
-    },
-    {
-      ruta: '/asignaturas-docente',
-      icono: 'stats-chart-outline',
-      etiqueta: 'Estadística',
-      secciones: ['Sección 001-D',]
-    },
-  ];
+  asignaturas: any[] = [];
 
   profileMenuButtons = [
     {
@@ -51,14 +34,53 @@ export class HomeDocentePage implements OnInit {
       role: 'cancel'
     }
   ];
-  
 
-  constructor(private router : Router) { }
+
+  constructor(
+    private router: Router,
+    private firestore: AngularFirestore,
+    private afAuth: AngularFireAuth) { }
 
   ngOnInit() {
+    this.obtenerAsignaturas();
   }
 
-  navegarASeccion(ruta: string, seccion: string) {
-    this.router.navigate([ruta], { queryParams: { seccion: seccion } });
+
+  obtenerAsignaturas() {
+    this.afAuth.currentUser.then(user => {
+      if (user) {
+        const docenteId = user.uid;
+        this.firestore.collection('asignaturas').snapshotChanges().subscribe((data: any) => {
+          console.log('Todas las asignaturas:', data);
+
+          this.asignaturas = data
+            .map((e: any) => {
+              const asignatura = e.payload.doc.data();
+              console.log('Asignatura:', asignatura);
+
+              const seccionesFiltradas = Object.keys(asignatura.secciones).filter(seccionKey => {
+                const seccion = asignatura.secciones[seccionKey];
+                return seccion.docenteId === docenteId;
+              }).map(seccionKey => asignatura.secciones[seccionKey]);
+
+              if (seccionesFiltradas.length > 0) {
+                return {
+                  id: e.payload.doc.id,
+                  nombre: asignatura.nombre,
+                  secciones: seccionesFiltradas,
+                };
+              }
+              return null;
+            })
+            .filter((asignatura: any) => asignatura !== null);
+        });
+      }
+    }).catch(error => {
+      console.error("Error al obtener el usuario:", error);
+    });
+  }
+
+  navegarASeccion(asignaturaId: string, seccion: any) {
+    this.router.navigate(['/asignaturas-docente'], { queryParams: { asignaturaId, seccion: seccion.nombre } });
   }
 }
