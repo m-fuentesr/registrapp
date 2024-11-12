@@ -8,7 +8,6 @@
 </ion-header>
 
 <ion-content class="ion-padding">
-
   <div class="ion-text-center">
     <ion-text color="primary">
       <h1>¡Registro!</h1>
@@ -21,7 +20,6 @@
 
   <ion-list>
     <form #miForm="ngForm" (ngSubmit)="registrarUsuario()">
-
       <ion-item>
         <ion-label>Tipo de usuario</ion-label>
         <ion-radio-group [(ngModel)]="usr.tipo" name="tipousuario" required>
@@ -40,32 +38,46 @@
         <ion-input label="Nombre" type="text" required labelPlacement="floating" name="usr.firstName" [(ngModel)]="usr.firstName" placeholder="Ingrese su nombre"></ion-input>
         <ion-icon name="person"></ion-icon>
       </ion-item>
+      <ion-text color="danger" *ngIf="errorMessages.firstName">
+        <p>{{ errorMessages.firstName }}</p>
+      </ion-text>
 
       <ion-item>
         <ion-input label="Apellido" type="text" required labelPlacement="floating" name="usr.lastName" [(ngModel)]="usr.lastName" placeholder="Ingrese su apellido"></ion-input>
         <ion-icon name="person"></ion-icon>
       </ion-item>
+      <ion-text color="danger" *ngIf="errorMessages.lastName">
+        <p>{{ errorMessages.lastName }}</p>
+      </ion-text>
 
       <ion-item>
-        <ion-input label="Correo Electrónico" type="email" required labelPlacement="floating" name="usr.email" [(ngModel)]="usr.email" placeholder="Ingrese correo electrónico" #emailField="ngModel"></ion-input>
+        <ion-input label="Correo Electrónico" type="email" required labelPlacement="floating" name="usr.email" [(ngModel)]="usr.email" placeholder="Ingrese correo electrónico"></ion-input>
         <ion-icon name="mail"></ion-icon>
       </ion-item>
+      <ion-text color="danger" *ngIf="errorMessages.email">
+        <p>{{ errorMessages.email }}</p>
+      </ion-text>
 
       <ion-item>
         <ion-input label="Contraseña" type="password" required labelPlacement="floating" name="usr.password" [(ngModel)]="usr.password" placeholder="Ingrese contraseña"></ion-input>
         <ion-icon name="lock-closed"></ion-icon>
       </ion-item>
+      <ion-text color="danger" *ngIf="errorMessages.password">
+        <p>{{ errorMessages.password }}</p>
+      </ion-text>
 
       <ion-item>
         <ion-input label="Confirmar Contraseña" type="password" required labelPlacement="floating" name="usr.confirmPassword" [(ngModel)]="usr.confirmPassword" placeholder="Confirme contraseña"></ion-input>
         <ion-icon name="lock-closed"></ion-icon>
       </ion-item>
+      <ion-text color="danger" *ngIf="errorMessages.confirmPassword">
+        <p>{{ errorMessages.confirmPassword }}</p>
+      </ion-text>
 
-    
+      <!-- Botón de Registro -->
       <ion-button expand="block" type="submit" fill="solid" color="primary" [disabled]="miForm.invalid">
         Registrarse
       </ion-button>
-
     </form>
   </ion-list>
 
@@ -75,8 +87,8 @@
     </ion-text>
   </div>
 
+  <!-- Imagen al final de la página -->
   <div class="ion-text-center">
     <img src="assets/icon/duoc.png" alt="Imagen duoc" class="duoc">
   </div>
-
 </ion-content>
