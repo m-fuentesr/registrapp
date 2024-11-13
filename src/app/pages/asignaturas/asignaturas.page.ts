@@ -4,7 +4,7 @@ import { AlertController } from '@ionic/angular';
 import { Geolocation } from '@capacitor/geolocation';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-asignaturas',
@@ -20,18 +20,24 @@ export class AsignaturasPage implements OnInit {
   fechaHoraActual: string = '';
   latitud: number | null = null;
   longitud: number | null = null;
+  alumnoId: string = ''
   nombreAlumno: string = '';
+  asignaturaNombre = '';
+  profesorNombre = '';
+  seccion: any = {};
 
   constructor(
     private alertController: AlertController,
     private firestore: AngularFirestore,
     private afAuth: AngularFireAuth,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) { }
 
   ngOnInit() {
     this.checkBarcodeScannerSupport();
-    this.obtenerNombreAlumno();
+    this.obtenerDatosAlumno();
+    this.obtenerDatosAsignatura();
   }
 
   async checkBarcodeScannerSupport() {
@@ -42,12 +48,36 @@ export class AsignaturasPage implements OnInit {
     }
   }
 
-  async obtenerNombreAlumno() {
+  async obtenerDatosAlumno() {
     const user = await this.afAuth.currentUser;
     if (user) {
-      const userId = user.uid;
-      this.firestore.collection('alumnos').doc(userId).valueChanges().subscribe((data: any) => {
+      this.alumnoId = user.uid;
+      this.firestore.collection('alumnos').doc(this.alumnoId).valueChanges().subscribe((data: any) => {
         this.nombreAlumno = data?.nombre || 'Alumno Desconocido';
+      });
+    }
+  }
+
+  obtenerDatosAsignatura() {
+    const asignaturaId = this.route.snapshot.queryParamMap.get('asignaturaId');
+    const seccionNombre = this.route.snapshot.queryParamMap.get('seccion');
+    
+    if (asignaturaId && seccionNombre) {
+      this.firestore.collection('asignaturas').doc(asignaturaId).valueChanges().subscribe((asignaturaData: any) => {
+        this.asignaturaNombre = asignaturaData?.nombre || 'Asignatura Desconocida';
+        const seccion = asignaturaData?.secciones?.[seccionNombre];
+        
+        if (seccion?.docenteId) {
+          this.firestore.collection('usuarios').doc(seccion.docenteId).valueChanges().subscribe((usuarioData: any) => {
+            if (usuarioData && usuarioData.tipo === 'docente') {
+              this.profesorNombre = `${usuarioData.firstName} ${usuarioData.lastName}` || 'Profesor Desconocido';
+            } else {
+              this.profesorNombre = 'Profesor Desconocido';
+            }
+          });
+        } else {
+          this.profesorNombre = 'Profesor Desconocido';
+        }
       });
     }
   }
@@ -84,8 +114,8 @@ export class AsignaturasPage implements OnInit {
   }
 
   async confirmarAsistencia(datosClase: any): Promise<void> {
-
     this.fechaHoraActual = new Date().toLocaleString();
+
     try {
       // Solicitar permisos antes de intentar obtener la ubicación
       const permission = await Geolocation.requestPermissions();
@@ -98,7 +128,7 @@ export class AsignaturasPage implements OnInit {
       this.latitud = posicion.coords.latitude;
       this.longitud = posicion.coords.longitude;
 
-      const alumnoRef = this.firestore.collection('asistencia').doc(this.nombreAlumno);
+      const alumnoRef = this.firestore.collection('asistencia').doc(this.alumnoId);
       const doc = await alumnoRef.get().toPromise();
 
       if (doc?.exists) {
@@ -109,11 +139,16 @@ export class AsignaturasPage implements OnInit {
         await alumnoRef.update({ clasesAsistidas, porcentajeAsistencia });
       } else {
         await alumnoRef.set({
+          alumnoId: this.alumnoId,
           nombre: this.nombreAlumno,
           clasesAsistidas: 1,
           porcentajeAsistencia: 5,
           clase: datosClase.clase,
           fecha: datosClase.fecha,
+          ubicacion: {
+            latitud: this.latitud,
+            longitud: this.longitud
+          }
         });
       }
     } catch (error) {
