@@ -11,7 +11,7 @@
 
   <ion-item>
     <ion-label>Selecciona la clase:</ion-label>
-    <ion-select [(ngModel)]="claseSeleccionada">
+    <ion-select [(ngModel)]="claseSeleccionada" (ionChange)="onClaseSeleccionada(claseSeleccionada)">
       <ion-select-option *ngFor="let clase of clasesDisponibles" [value]="clase.nombre">
         {{ clase.nombre }} - {{ clase.fecha }}
       </ion-select-option>
@@ -43,7 +43,7 @@
     <p>Escanee este código para marcar asistencia.</p>
   </div>
 
-  <ion-button expand="block" routerLink="/clase-actual" fill="solid" color="primary">
+  <ion-button expand="block" routerLink="/clase-actual" [queryParams]="{ claseSeleccionada: claseSeleccionada }" [disabled]="!claseSeleccionada" fill="solid" color="primary">
     Ver Clase Actual
   </ion-button>
 </ion-content>

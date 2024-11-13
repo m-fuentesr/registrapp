@@ -24,6 +24,7 @@ export class AsignaturasPage implements OnInit {
   asignaturaNombre = '';
   profesorNombre = '';
   seccion: any = {};
+  claseNombre: string = '';
 
   constructor(
     private alertController: AlertController,
@@ -31,7 +32,7 @@ export class AsignaturasPage implements OnInit {
     private afAuth: AngularFireAuth,
     private router: Router,
     private route: ActivatedRoute
-  ) {}
+  ) { }
 
   ngOnInit() {
     this.checkBarcodeScannerSupport();
@@ -51,6 +52,7 @@ export class AsignaturasPage implements OnInit {
     const user = await this.afAuth.currentUser;
     if (user) {
       this.alumnoId = user.uid;
+      console.log('Alumno ID:', this.alumnoId);
       this.firestore.collection('alumnos').doc(this.alumnoId).valueChanges().subscribe((data: any) => {
         this.nombreAlumno = data?.nombre || 'Alumno Desconocido';
       });
@@ -60,18 +62,25 @@ export class AsignaturasPage implements OnInit {
   obtenerDatosAsignatura() {
     const asignaturaId = this.route.snapshot.queryParamMap.get('asignaturaId');
     const seccionNombre = this.route.snapshot.queryParamMap.get('seccion');
-    
+
+    console.log("Asignatura ID:", asignaturaId);
+    console.log("Sección:", seccionNombre);
+
     if (asignaturaId && seccionNombre) {
       this.firestore.collection('asignaturas').doc(asignaturaId).valueChanges().subscribe((asignaturaData: any) => {
         this.asignaturaNombre = asignaturaData?.nombre || 'Asignatura Desconocida';
         const seccion = asignaturaData?.secciones?.[seccionNombre];
-        
-        if (seccion?.docenteId) {
-          this.firestore.collection('usuarios').doc(seccion.docenteId).valueChanges().subscribe((usuarioData: any) => {
-            this.profesorNombre = `${usuarioData?.firstName ?? 'Profesor'} ${usuarioData?.lastName ?? 'Desconocido'}`;
-          });
-        } else {
-          this.profesorNombre = 'Profesor Desconocido';
+
+        if (seccion) {
+          this.seccion = seccion;
+
+          if (seccion?.docenteId) {
+            this.firestore.collection('usuarios').doc(seccion.docenteId).valueChanges().subscribe((usuarioData: any) => {
+              this.profesorNombre = `${usuarioData?.firstName ?? 'Profesor'} ${usuarioData?.lastName ?? 'Desconocido'}`;
+            });
+          } else {
+            this.profesorNombre = 'Profesor Desconocido';
+          }
         }
       });
     }
@@ -79,6 +88,7 @@ export class AsignaturasPage implements OnInit {
 
   async registrarAsistencia(): Promise<void> {
     try {
+      console.log('Iniciando escaneo...');
       const granted = await this.requestPermissions();
       if (!granted) {
         await this.presentAlert('Permiso denegado', 'Para usar la aplicación debe autorizar los permisos de cámara.');
@@ -86,17 +96,43 @@ export class AsignaturasPage implements OnInit {
       }
 
       this.isScanning = true;
+      console.log('Escaneando código...');
       const { barcodes } = await BarcodeScanner.scan();
       this.barcodes.push(...barcodes);
+      console.log('Códigos detectados:', barcodes);
 
       if (this.barcodes.length > 0 && this.barcodes[0].displayValue) {
         const datosClase = JSON.parse(this.barcodes[0].displayValue);
-        await this.confirmarAsistencia(datosClase);
+        console.log("Datos del código QR:", JSON.stringify(datosClase));
+
+        // Asegúrate de que la clase que se escaneó es válida
+        if (datosClase.asignatura.toLowerCase() === this.route.snapshot.queryParamMap.get('asignaturaId')?.toLowerCase() &&
+          datosClase.seccion.toLowerCase() === this.route.snapshot.queryParamMap.get('seccion')?.toLowerCase()) {
+
+          // Verificar si el alumno ya ha sido registrado en esta clase
+          const asistenciaRef = this.firestore.collection('asistencia').doc(this.alumnoId);
+          const doc = await asistenciaRef.get().toPromise();
+
+          if (doc?.exists) {
+            const data = doc.data() as { clasesAsistidas: number; clasesRegistradas: string[] };
+            // Verifica si la clase ya ha sido registrada
+            if (data?.clasesRegistradas?.includes(datosClase.clase)) {
+              await this.presentAlert('Asistencia ya registrada', 'Ya has registrado tu asistencia para esta clase.');
+              return;
+            }
+          }
+
+          console.log('QR válido, confirmando asistencia...');
+          await this.confirmarAsistencia(datosClase);  // Registrar asistencia si el QR es válido
+        } else {
+          await this.presentAlert('Error', 'El código QR no pertenece a esta asignatura o sección.');
+        }
       } else {
         await this.presentAlert('Error', 'No se detectó ningún código QR válido.');
       }
     } catch (error) {
-      await this.presentAlert('Error', 'Ocurrió un error durante el escaneo.');
+      console.error('Error al escanear el código QR:', error);
+      await this.presentAlert('Error', 'Ocurrió un error al escanear.');
     } finally {
       this.isScanning = false;
     }
@@ -109,6 +145,7 @@ export class AsignaturasPage implements OnInit {
 
   async confirmarAsistencia(datosClase: any): Promise<void> {
     this.fechaHoraActual = new Date().toLocaleString();
+    this.claseNombre = datosClase.clase;
 
     try {
       const permission = await Geolocation.requestPermissions();
@@ -124,11 +161,15 @@ export class AsignaturasPage implements OnInit {
       const doc = await alumnoRef.get().toPromise();
 
       if (doc?.exists) {
-        const data = doc.data() as { clasesAsistidas: number; porcentajeAsistencia: number };
+        const data = doc.data() as { clasesAsistidas: number; clasesRegistradas: string[] };
         const clasesAsistidas = (data?.clasesAsistidas ?? 0) + 1;
         const porcentajeAsistencia = (clasesAsistidas / 5) * 100;
 
-        await alumnoRef.update({ clasesAsistidas, porcentajeAsistencia });
+        await alumnoRef.update({
+          clasesAsistidas,
+          porcentajeAsistencia,
+          clasesRegistradas: [...(data?.clasesRegistradas ?? []), datosClase.clase]  // Agregar la clase
+        });
       } else {
         await alumnoRef.set({
           alumnoId: this.alumnoId,
@@ -140,7 +181,8 @@ export class AsignaturasPage implements OnInit {
           ubicacion: {
             latitud: this.latitud,
             longitud: this.longitud
-          }
+          },
+          clasesRegistradas: [datosClase.clase]
         });
       }
 
@@ -157,7 +199,7 @@ export class AsignaturasPage implements OnInit {
     }
 
     this.asistenciaConfirmada = true;
-    const mensaje = `Fecha y hora: ${this.fechaHoraActual}\nUbicación: Latitud ${this.latitud}, Longitud ${this.longitud}`;
+    const mensaje = `${this.claseNombre}\nFecha y hora: ${this.fechaHoraActual}\nUbicación: Latitud ${this.latitud}, Longitud ${this.longitud}`;
     await this.presentAlert('¡Asistencia confirmada!', mensaje);
   }
 
