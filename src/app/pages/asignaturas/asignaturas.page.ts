@@ -12,7 +12,6 @@ import { ActivatedRoute, Router } from '@angular/router';
   styleUrls: ['./asignaturas.page.scss'],
 })
 export class AsignaturasPage implements OnInit {
-
   isSupported = false;
   barcodes: Barcode[] = [];
   isScanning: boolean = false;
@@ -20,7 +19,7 @@ export class AsignaturasPage implements OnInit {
   fechaHoraActual: string = '';
   latitud: number | null = null;
   longitud: number | null = null;
-  alumnoId: string = ''
+  alumnoId: string = '';
   nombreAlumno: string = '';
   asignaturaNombre = '';
   profesorNombre = '';
@@ -32,7 +31,7 @@ export class AsignaturasPage implements OnInit {
     private afAuth: AngularFireAuth,
     private router: Router,
     private route: ActivatedRoute
-  ) { }
+  ) {}
 
   ngOnInit() {
     this.checkBarcodeScannerSupport();
@@ -69,11 +68,7 @@ export class AsignaturasPage implements OnInit {
         
         if (seccion?.docenteId) {
           this.firestore.collection('usuarios').doc(seccion.docenteId).valueChanges().subscribe((usuarioData: any) => {
-            if (usuarioData && usuarioData.tipo === 'docente') {
-              this.profesorNombre = `${usuarioData.firstName} ${usuarioData.lastName}` || 'Profesor Desconocido';
-            } else {
-              this.profesorNombre = 'Profesor Desconocido';
-            }
+            this.profesorNombre = `${usuarioData?.firstName ?? 'Profesor'} ${usuarioData?.lastName ?? 'Desconocido'}`;
           });
         } else {
           this.profesorNombre = 'Profesor Desconocido';
@@ -95,7 +90,6 @@ export class AsignaturasPage implements OnInit {
       this.barcodes.push(...barcodes);
 
       if (this.barcodes.length > 0 && this.barcodes[0].displayValue) {
-        console.log("Código QR escaneado:", this.barcodes[0].displayValue);
         const datosClase = JSON.parse(this.barcodes[0].displayValue);
         await this.confirmarAsistencia(datosClase);
       } else {
@@ -117,10 +111,8 @@ export class AsignaturasPage implements OnInit {
     this.fechaHoraActual = new Date().toLocaleString();
 
     try {
-      // Solicitar permisos antes de intentar obtener la ubicación
       const permission = await Geolocation.requestPermissions();
       if (permission.location !== 'granted') {
-        // Si no se otorgan permisos, muestra una alerta
         await this.presentAlert('Error de ubicación', 'No se otorgaron permisos para acceder a la ubicación.');
         return;
       }
@@ -151,6 +143,14 @@ export class AsignaturasPage implements OnInit {
           }
         });
       }
+
+      this.firestore.collection('clase_actual').add({
+        alumnoId: this.alumnoId,
+        nombre: this.nombreAlumno,
+        clase: datosClase.clase,
+        fecha: datosClase.fecha,
+      });
+
     } catch (error) {
       await this.presentAlert('Error de ubicación', 'No se pudo obtener la ubicación.');
       return;
@@ -161,11 +161,11 @@ export class AsignaturasPage implements OnInit {
     await this.presentAlert('¡Asistencia confirmada!', mensaje);
   }
 
-  async presentAlert(header: string, message: string): Promise<void> {
+  async presentAlert(titulo: string, mensaje: string) {
     const alert = await this.alertController.create({
-      header,
-      message,
-      buttons: ['OK'],
+      header: titulo,
+      message: mensaje,
+      buttons: ['OK']
     });
     await alert.present();
   }

@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { AngularFirestore } from '@angular/fire/compat/firestore';
 
 @Component({
   selector: 'app-clase-actual',
@@ -6,15 +7,19 @@ import { Component, OnInit } from '@angular/core';
   styleUrls: ['./clase-actual.page.scss'],
 })
 export class ClaseActualPage implements OnInit {
-  // Lista de alumnos con su estado de presencia
-  alumnosPresentes = [
-    { nombre: 'Matias Fuentes', presente: true },
-    { nombre: 'Ignacio Sorko', presente: false },
-    { nombre: 'Sebastian Monjes', presente: true },
-    // Agrega más alumnos según sea necesario
-  ];
+  alumnosPresentes: any[] = [];
+  claseSeleccionada: string = '';
 
-  constructor() {}
+  constructor(private firestore: AngularFirestore) {}
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.obtenerAlumnosPresentes();
+  }
+
+  obtenerAlumnosPresentes() {
+    this.firestore.collection('clase_actual').valueChanges().subscribe((alumnos: any[]) => {
+      // Filtrar solo los alumnos que escanearon el QR para la clase específica
+      this.alumnosPresentes = alumnos.filter(alumno => alumno.clase === this.claseSeleccionada);
+    });
+  }
 }

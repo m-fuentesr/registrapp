@@ -10,7 +10,6 @@ import { ActivatedRoute } from '@angular/router';
   styleUrls: ['./asignaturas-docente.page.scss'],
 })
 export class AsignaturasDocentePage implements OnInit {
-
   alumnos: any[] = [];
   qrCodeUrl: string = '';
   claseSeleccionada: string = ''; 
@@ -24,7 +23,8 @@ export class AsignaturasDocentePage implements OnInit {
   constructor(
     private firestore: AngularFirestore, 
     private afAuth: AngularFireAuth,
-    private route: ActivatedRoute) {}
+    private route: ActivatedRoute
+  ) {}
 
   ngOnInit() {
     this.obtenerAlumnos();
@@ -58,7 +58,6 @@ export class AsignaturasDocentePage implements OnInit {
           this.seccion = seccion;
           this.clasesDisponibles = this.seccion.clases || [];
           this.totalClases = this.clasesDisponibles.length;
-          console.log('Sección encontrada:', this.seccion);
         } else {
           console.error('Sección no encontrada.');
         }
@@ -74,7 +73,6 @@ export class AsignaturasDocentePage implements OnInit {
       return;
     }
 
-    // Datos de la clase y sección específicas
     const datosClase = { 
       asignatura: this.asignaturaId,
       seccion: this.seccion.nombre,
@@ -83,7 +81,6 @@ export class AsignaturasDocentePage implements OnInit {
       docenteId: this.docenteId
     };
 
-    // Generar el código QR con los datos específicos de la clase y sección
     QRCode.toDataURL(JSON.stringify(datosClase))
       .then(url => {
         this.qrCodeUrl = url;
