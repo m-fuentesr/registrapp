@@ -3,17 +3,19 @@
 <ion-content class="ion-padding">
   <ion-item>
     <ion-label>
-      <h1>Programación Móvil</h1>
-      <p>Sección: </p>
-      <p>Sala: </p>
+      <h1>{{ asignaturaNombre }}</h1>
+      <p *ngIf="seccion?.nombre">{{ seccion?.nombre }}</p>
+      <p *ngIf="!seccion?.nombre">Cargando sección...</p>
     </ion-label>
   </ion-item>
+
   <ion-item>
-    <ion-label>
-      <h1>Asistencia Promedio</h1>
-      <p>Porcentaje: </p>
-      <p>N° de clases: </p>
-    </ion-label>
+    <ion-label>Selecciona la clase:</ion-label>
+    <ion-select [(ngModel)]="claseSeleccionada">
+      <ion-select-option *ngFor="let clase of clasesDisponibles" [value]="clase.nombre">
+        {{ clase.nombre }} - {{ clase.fecha }}
+      </ion-select-option>
+    </ion-select>
   </ion-item>
 
   <ion-item-divider>
@@ -25,14 +27,14 @@
   <ion-list>
     <ion-item *ngFor="let alumno of alumnos">
       <ion-label>
-        <h2>{{alumno.nombre}}</h2>
-        <p>Porcentaje de asistencia: {{alumno.porcentajeAsistencia}}%</p>
-        <p>Asistió a {{alumno.clasesAsistidas}} de 20 clases</p>
+        <h2>{{ alumno.nombre }}</h2>
+        <p>Porcentaje de asistencia: {{ alumno.porcentajeAsistencia }}%</p>
+        <p>Asistió a {{ alumno.clasesAsistidas }} de {{ totalClases }}</p>
       </ion-label>
     </ion-item>
   </ion-list>
 
-  <ion-button expand="block" color="primary" (click)="generarCodigoQR()">
+  <ion-button expand="block" color="primary" (click)="generarCodigoQR()" [disabled]="!claseSeleccionada">
     Generar Código QR
   </ion-button>
 

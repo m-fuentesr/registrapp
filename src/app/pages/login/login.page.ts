@@ -3,6 +3,9 @@ import { Router } from '@angular/router';
 import { Usuario } from 'src/app/interfaces/usuario';
 import { StorageService } from 'src/app/services/dbstorage.service';
 import { AlertController } from '@ionic/angular';
+import { AngularFirestore } from '@angular/fire/compat/firestore';
+import { AngularFireAuth } from '@angular/fire/compat/auth';
+import { lastValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-login',
@@ -19,7 +22,9 @@ export class LoginPage implements OnInit {
 
   constructor(
     private router: Router, 
-    private dbstorage: StorageService, 
+    private dbstorage: StorageService,
+    private firestore: AngularFirestore,
+    private afAuth: AngularFireAuth,
     private alertController: AlertController
   ) {}
 
@@ -28,21 +33,31 @@ export class LoginPage implements OnInit {
   async iniciarSesion() {
     console.log("Submit del formulario");
 
-    // Recuperar el usuario almacenado
-    const storedUser = await this.dbstorage.getUser();
+    try {
+      const userCredential = await this.afAuth.signInWithEmailAndPassword(this.usr.email, this.usr.password);
+      const storedUser = userCredential.user; // Recuperar el usuario almacenado
 
-    // Verificar si el usuario existe y las credenciales son correctas
-    if (storedUser && storedUser.email === this.usr.email && storedUser.password === this.usr.password) {
-      console.log('¡Autorizado!');
+      // Verificar si el usuario existe y las credenciales son correctas
+      if (storedUser) {
 
-      // Verificar que el tipo de usuario sea 'alumno'
-      if (storedUser.tipo === 'alumno') {
-        this.router.navigate(['/home']); // Redirigir a home si es alumno
-      } else {
-        // Si es un docente, mostrar alerta
-        this.mostrarAlerta('Acceso denegado', 'Solo los alumnos pueden acceder a esta página.');
+        // Obtener el tipo de usuario desde Firestore
+        const userDoc = await lastValueFrom(this.firestore.collection('usuarios').doc(storedUser.uid).get());
+        console.log('¡Autorizado!');
+
+        if (userDoc.exists) {
+          const userData: any = userDoc.data();
+
+          // Verificar que el tipo de usuario sea 'alumno'
+          if (userData['tipo'] === 'alumno') {
+            this.router.navigate(['/home']); // Redirigir a home si es alumno
+          } else {
+            // Si es un docente, mostrar alerta
+            this.mostrarAlerta('Acceso denegado', 'Solo los alumnos pueden acceder a esta página.');
+          }
+        }  
       }
-    } else {
+
+    } catch (error) {
       // Si las credenciales son incorrectas, mostrar alerta
       this.mostrarAlerta('Credenciales incorrectas', 'Por favor, intente de nuevo.');
     }

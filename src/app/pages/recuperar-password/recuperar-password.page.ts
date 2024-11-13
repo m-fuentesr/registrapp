@@ -1,6 +1,5 @@
 import { Component } from '@angular/core';
-import { Router } from '@angular/router';
-import { AlertController } from '@ionic/angular';
+import { AuthService } from 'src/app/services/auth.service';
 
 @Component({
   selector: 'app-recuperar-password',
@@ -10,22 +9,13 @@ import { AlertController } from '@ionic/angular';
 export class RecuperarPasswordPage {
   email: string = '';
 
-  constructor(private router: Router, private alertController: AlertController) {
+  constructor(private authService: AuthService) {}
 
-  }
-
-  async recuperarPassword() {
-    await this.presentAlert();
-  }
-
-  async presentAlert() {
-    const alert = await this.alertController.create({
-      header: 'Instrucciones Enviadas',
-      message: 'Se han enviado las instrucciones para recuperar tu contraseña a tu correo electrónico.',
-      buttons: ['OK'],
-      backdropDismiss: false
-    });
-
-    await alert.present();
+  recuperarPassword() {
+    if (this.email) {
+      this.authService.resetPassword(this.email);
+    } else {
+      console.error('Por favor, ingresa un correo electrónico válido.');
+    }
   }
 }

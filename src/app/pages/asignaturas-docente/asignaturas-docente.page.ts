@@ -1,5 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import * as QRCode from 'qrcode';
+import { AngularFirestore } from '@angular/fire/compat/firestore';
+import { AngularFireAuth } from '@angular/fire/compat/auth';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-asignaturas-docente',
@@ -8,25 +11,79 @@ import * as QRCode from 'qrcode';
 })
 export class AsignaturasDocentePage implements OnInit {
 
-  alumnos = [
-    { nombre: 'Matías Fuentes', porcentajeAsistencia: 100, clasesAsistidas: 20 },
-    { nombre: 'Sebastián Monjes', porcentajeAsistencia: 100, clasesAsistidas: 20 },
-    { nombre: 'Ignacio Sorko', porcentajeAsistencia: 50, clasesAsistidas: 10 },
-  ];
+  alumnos: any[] = [];
+  qrCodeUrl: string = '';
+  claseSeleccionada: string = ''; 
+  docenteId: string = '';
+  asignaturaId: string = '';
+  asignaturaNombre: string = '';
+  seccion: any = {};
+  clasesDisponibles: any[] = [];
+  totalClases: number = 0;
 
-  constructor() { }
+  constructor(
+    private firestore: AngularFirestore, 
+    private afAuth: AngularFireAuth,
+    private route: ActivatedRoute) {}
 
   ngOnInit() {
+    this.obtenerAlumnos();
+    this.route.queryParams.subscribe(params => {
+      this.asignaturaId = params['asignaturaId'] || '';
+      if (this.asignaturaId && params['seccion']) {
+        this.obtenerSeccionYClases(params['seccion']);
+      }
+    });
+
+    this.afAuth.authState.subscribe(user => {
+      if (user) {
+        this.docenteId = user.uid;
+      }
+    });
   }
 
-  qrCodeUrl: string = '';
+  async obtenerAlumnos() {
+    this.firestore.collection('asistencia').valueChanges().subscribe((data: any) => {
+      this.alumnos = data;
+    });
+  }
+
+  obtenerSeccionYClases(seccionNombre: string) {
+    this.firestore.collection('asignaturas').doc(this.asignaturaId).valueChanges().subscribe((asignatura: any) => {
+      if (asignatura && asignatura.secciones) {
+        this.asignaturaNombre = asignatura.nombre;
+        const seccion = asignatura.secciones[seccionNombre];
+
+        if (seccion) {
+          this.seccion = seccion;
+          this.clasesDisponibles = this.seccion.clases || [];
+          this.totalClases = this.clasesDisponibles.length;
+          console.log('Sección encontrada:', this.seccion);
+        } else {
+          console.error('Sección no encontrada.');
+        }
+      } else {
+        console.error('No se encontró la asignatura o el campo "secciones" no existe.');
+      }
+    });
+  }
 
   generarCodigoQR() {
+    if (!this.claseSeleccionada || !this.asignaturaId || !this.seccion.nombre) {
+      console.error('Debe seleccionar una clase.');
+      return;
+    }
+
+    // Datos de la clase y sección específicas
     const datosClase = { 
-      clase: 'Programación Móvil', 
-      fecha: new Date().toISOString() 
+      asignatura: this.asignaturaId,
+      seccion: this.seccion.nombre,
+      clase: this.claseSeleccionada,
+      fecha: new Date().toISOString(),
+      docenteId: this.docenteId
     };
-    
+
+    // Generar el código QR con los datos específicos de la clase y sección
     QRCode.toDataURL(JSON.stringify(datosClase))
       .then(url => {
         this.qrCodeUrl = url;
@@ -36,5 +93,4 @@ export class AsignaturasDocentePage implements OnInit {
         console.error('Error generando el código QR:', err);
       });
   }
-
 }

@@ -18,14 +18,14 @@
   </ion-text>
 
   <ion-accordion-group expand="inset" lines="none" mode="ios">
-    <ion-accordion *ngFor="let item of elementos">
+    <ion-accordion *ngFor="let asignatura of asignaturas">
       <ion-item slot="header" detail="false">
-        <ion-icon name="{{item.icono}}" slot="start"></ion-icon>
-        <ion-label>{{item.etiqueta}}</ion-label>
+        <ion-icon name="laptop-outline" slot="start"></ion-icon>
+        <ion-label>{{ asignatura.nombre }}</ion-label>
       </ion-item>
       <ion-list slot="content">
-        <ion-item *ngFor="let seccion of item.secciones" (click)="navegarASeccion(item.ruta, seccion)">
-          <ion-label>{{seccion}}</ion-label>
+        <ion-item *ngFor="let seccion of asignatura.secciones" (click)="navegarASeccion(asignatura.id, seccion)">
+          <ion-label>{{ seccion.nombre }}</ion-label>
         </ion-item>
       </ion-list>
     </ion-accordion>
