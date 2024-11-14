@@ -15,25 +15,24 @@ export class ClaseActualPage implements OnInit {
   constructor(
     private firestore: AngularFirestore,
     private route: ActivatedRoute
-  ) {}
+  ) { }
 
   ngOnInit() {
     this.route.queryParams.subscribe(params => {
       this.claseSeleccionada = params['claseSeleccionada'];
       this.asignaturaId = params['asignaturaId']; // Obtener el ID de la asignatura desde los parámetros
+      console.log('Clase seleccionada:', this.claseSeleccionada);
+      console.log('Asignatura ID:', this.asignaturaId);
       this.obtenerAlumnosPresentes();
     });
   }
 
   async obtenerAlumnosPresentes() {
-    this.firestore.collection('clase_actual').valueChanges().subscribe(async (alumnos: any[]) => {
-      // Filtrar los alumnos que escanearon el QR para la clase y asignatura específicas
-      const alumnosFiltrados = alumnos.filter(alumno => 
-        alumno.clase === this.claseSeleccionada && alumno.asignaturaId === this.asignaturaId
-      );
-
-      // Obtener los nombres de cada alumno desde la colección "usuarios"
-      const alumnosConNombre = await Promise.all(alumnosFiltrados.map(async (alumno) => {
+    this.firestore.collection('clase_actual', ref =>
+      ref.where('clase', '==', this.claseSeleccionada)
+        .where('asignaturaId', '==', this.asignaturaId)
+    ).valueChanges().subscribe(async (alumnos: any[]) => {
+      const alumnosConNombre = await Promise.all(alumnos.map(async (alumno) => {
         const usuarioDoc = await this.firestore.collection('usuarios').doc(alumno.alumnoId).get().toPromise();
         const usuarioData = usuarioDoc?.data();
 
@@ -44,7 +43,6 @@ export class ClaseActualPage implements OnInit {
         return { ...alumno, nombre: nombreAlumno };
       }));
 
-      // Asignar la lista con los nombres obtenidos
       this.alumnosPresentes = alumnosConNombre;
     });
   }

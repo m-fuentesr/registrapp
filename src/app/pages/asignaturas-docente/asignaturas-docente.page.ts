@@ -111,7 +111,7 @@ export class AsignaturasDocentePage implements OnInit {
   
 
   private obtenerClaseFirestore(asignaturaId: string, claseId: string) {
-    
+    console.log(`Obteniendo clase en Firestore para asignaturaId: ${asignaturaId}, claseId: ${claseId}`);
     return this.firestore.collection('asignaturas').doc(asignaturaId)
       .collection('clases').doc(claseId);
   }

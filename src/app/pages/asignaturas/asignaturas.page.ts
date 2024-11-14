@@ -25,6 +25,8 @@ export class AsignaturasPage implements OnInit {
   profesorNombre = '';
   seccion: any = {};
   claseNombre: string = '';
+  asignaturaId: string = ''; 
+  claseSeleccionada: string = '';
 
   constructor(
     private alertController: AlertController,
@@ -60,14 +62,14 @@ export class AsignaturasPage implements OnInit {
   }
 
   obtenerDatosAsignatura() {
-    const asignaturaId = this.route.snapshot.queryParamMap.get('asignaturaId');
-    const seccionNombre = this.route.snapshot.queryParamMap.get('seccion');
+    this.asignaturaId = this.route.snapshot.queryParamMap.get('asignaturaId')|| '';
+    const seccionNombre = this.route.snapshot.queryParamMap.get('seccion')|| '';
 
-    console.log("Asignatura ID:", asignaturaId);
+    console.log("Asignatura ID:", this.asignaturaId);
     console.log("Sección:", seccionNombre);
 
-    if (asignaturaId && seccionNombre) {
-      this.firestore.collection('asignaturas').doc(asignaturaId).valueChanges().subscribe((asignaturaData: any) => {
+    if (this.asignaturaId && seccionNombre) {
+      this.firestore.collection('asignaturas').doc(this.asignaturaId).valueChanges().subscribe((asignaturaData: any) => {
         this.asignaturaNombre = asignaturaData?.nombre || 'Asignatura Desconocida';
         const seccion = asignaturaData?.secciones?.[seccionNombre];
 
@@ -157,8 +159,11 @@ export class AsignaturasPage implements OnInit {
       this.latitud = posicion.coords.latitude;
       this.longitud = posicion.coords.longitude;
 
-      const alumnoRef = this.firestore.collection('asistencia').doc(this.alumnoId);
+      const alumnoRef = this.firestore.collection('asistencia').doc(this.alumnoId).collection(this.asignaturaId).doc(this.claseSeleccionada);
       const doc = await alumnoRef.get().toPromise();
+
+      // const asignaturaId = this.route.snapshot.queryParamMap.get('asignaturaId');
+      const seccionNombre = this.route.snapshot.queryParamMap.get('seccion');
 
       if (doc?.exists) {
         const data = doc.data() as { clasesAsistidas: number; clasesRegistradas: string[] };
@@ -168,6 +173,8 @@ export class AsignaturasPage implements OnInit {
         await alumnoRef.update({
           clasesAsistidas,
           porcentajeAsistencia,
+          asignaturaId: this.asignaturaId,
+          seccion: seccionNombre,
           clasesRegistradas: [...(data?.clasesRegistradas ?? []), datosClase.clase]  // Agregar la clase
         });
       } else {
@@ -175,14 +182,16 @@ export class AsignaturasPage implements OnInit {
           alumnoId: this.alumnoId,
           nombre: this.nombreAlumno,
           clasesAsistidas: 1,
-          porcentajeAsistencia: 5,
+          porcentajeAsistencia: 20,
           clase: datosClase.clase,
           fecha: datosClase.fecha,
           ubicacion: {
             latitud: this.latitud,
             longitud: this.longitud
           },
-          clasesRegistradas: [datosClase.clase]
+          clasesRegistradas: [datosClase.clase],
+          asignaturaId: this.asignaturaId,
+          seccion: seccionNombre
         });
       }
 
@@ -191,6 +200,8 @@ export class AsignaturasPage implements OnInit {
         nombre: this.nombreAlumno,
         clase: datosClase.clase,
         fecha: datosClase.fecha,
+        asignaturaId: this.asignaturaId,   
+        seccion: seccionNombre 
       });
 
     } catch (error) {
