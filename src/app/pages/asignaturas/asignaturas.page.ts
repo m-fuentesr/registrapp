@@ -5,6 +5,8 @@ import { Geolocation } from '@capacitor/geolocation';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Network } from '@capacitor/network';
+import { Storage } from '@ionic/storage-angular';
 
 @Component({
   selector: 'app-asignaturas',
@@ -25,13 +27,14 @@ export class AsignaturasPage implements OnInit {
   profesorNombre = '';
   seccion: any = {};
   claseNombre: string = '';
-  asignaturaId: string = ''; 
+  asignaturaId: string = '';
   claseSeleccionada: string = '';
 
   constructor(
     private alertController: AlertController,
     private firestore: AngularFirestore,
     private afAuth: AngularFireAuth,
+    private storage: Storage,
     private router: Router,
     private route: ActivatedRoute
   ) { }
@@ -62,8 +65,8 @@ export class AsignaturasPage implements OnInit {
   }
 
   obtenerDatosAsignatura() {
-    this.asignaturaId = this.route.snapshot.queryParamMap.get('asignaturaId')|| '';
-    const seccionNombre = this.route.snapshot.queryParamMap.get('seccion')|| '';
+    this.asignaturaId = this.route.snapshot.queryParamMap.get('asignaturaId') || '';
+    const seccionNombre = this.route.snapshot.queryParamMap.get('seccion') || '';
 
     console.log("Asignatura ID:", this.asignaturaId);
     console.log("Sección:", seccionNombre);
@@ -155,71 +158,81 @@ export class AsignaturasPage implements OnInit {
         await this.presentAlert('Error de ubicación', 'No se otorgaron permisos para acceder a la ubicación.');
         return;
       }
+
       const posicion = await Geolocation.getCurrentPosition();
       this.latitud = posicion.coords.latitude;
       this.longitud = posicion.coords.longitude;
 
-      const alumnoRef = this.firestore.collection('asistencia').doc(this.alumnoId).collection(this.asignaturaId).doc(this.claseSeleccionada);
-      const doc = await alumnoRef.get().toPromise();
-
-      // const asignaturaId = this.route.snapshot.queryParamMap.get('asignaturaId');
-      const seccionNombre = this.route.snapshot.queryParamMap.get('seccion');
-
-      if (doc?.exists) {
-        const data = doc.data() as { clasesAsistidas: number; clasesRegistradas: string[] };
-        const clasesAsistidas = (data?.clasesAsistidas ?? 0) + 1;
-        const porcentajeAsistencia = (clasesAsistidas / 5) * 100;
-
-        await alumnoRef.update({
-          clasesAsistidas,
-          porcentajeAsistencia,
-          asignaturaId: this.asignaturaId,
-          seccion: seccionNombre,
-          clasesRegistradas: [...(data?.clasesRegistradas ?? []), datosClase.clase]  // Agregar la clase
-        });
-      } else {
-        await alumnoRef.set({
-          alumnoId: this.alumnoId,
-          nombre: this.nombreAlumno,
-          clasesAsistidas: 1,
-          porcentajeAsistencia: 20,
-          clase: datosClase.clase,
-          fecha: datosClase.fecha,
-          ubicacion: {
-            latitud: this.latitud,
-            longitud: this.longitud
-          },
-          clasesRegistradas: [datosClase.clase],
-          asignaturaId: this.asignaturaId,
-          seccion: seccionNombre
-        });
-      }
-
-      this.firestore.collection('clase_actual').add({
+      // Crear el objeto de asistencia a guardar
+      const asistenciaData = {
         alumnoId: this.alumnoId,
         nombre: this.nombreAlumno,
+        clasesAsistidas: 1,
+        porcentajeAsistencia: 20,
         clase: datosClase.clase,
         fecha: datosClase.fecha,
-        asignaturaId: this.asignaturaId,   
-        seccion: seccionNombre 
-      });
+        ubicacion: { latitud: this.latitud, longitud: this.longitud },
+        clasesRegistradas: [datosClase.clase],
+        asignaturaId: this.asignaturaId,
+        seccion: this.route.snapshot.queryParamMap.get('seccion')
+      };
 
+      // Comprobar si hay conexión a Internet
+      const status = await Network.getStatus();
+      if (status.connected) {
+        // Si hay conexión, guarda directamente en Firestore
+        const alumnoRef = this.firestore.collection('asistencia').doc(this.alumnoId).collection(this.asignaturaId).doc(this.claseSeleccionada);
+        const doc = await alumnoRef.get().toPromise();
+
+        if (doc?.exists) {
+          const data = doc.data() as { clasesAsistidas: number; clasesRegistradas: string[] };
+          const clasesAsistidas = (data?.clasesAsistidas ?? 0) + 1;
+          const porcentajeAsistencia = (clasesAsistidas / 5) * 100;
+
+          await alumnoRef.update({
+            clasesAsistidas,
+            porcentajeAsistencia,
+            asignaturaId: this.asignaturaId,
+            seccion: asistenciaData.seccion,
+            clasesRegistradas: [...(data?.clasesRegistradas ?? []), datosClase.clase]
+          });
+        } else {
+          await alumnoRef.set(asistenciaData);
+        }
+
+        // Guardar también en la colección clase_actual
+        await this.firestore.collection('clase_actual').add({
+          alumnoId: this.alumnoId,
+          nombre: this.nombreAlumno,
+          clase: datosClase.clase,
+          fecha: datosClase.fecha,
+          asignaturaId: this.asignaturaId,
+          seccion: asistenciaData.seccion
+        });
+      } else {
+        // Si no hay conexión, guarda en localStorage para sincronizar luego
+        const asistenciasPendientes = (await this.storage.get('asistenciasPendientes')) || [];
+        asistenciasPendientes.push(asistenciaData);
+        await this.storage.set('asistenciasPendientes', asistenciasPendientes);
+        console.log('Asistencia guardada localmente para sincronizar luego.');
+      }
+
+      this.asistenciaConfirmada = true;
+      const mensaje = `${this.claseNombre}\nFecha y hora: ${this.fechaHoraActual}\nUbicación: Latitud ${this.latitud}, Longitud ${this.longitud}`;
+      await this.presentAlert('¡Asistencia confirmada!', mensaje);
+    
     } catch (error) {
       await this.presentAlert('Error de ubicación', 'No se pudo obtener la ubicación.');
       return;
     }
-
-    this.asistenciaConfirmada = true;
-    const mensaje = `${this.claseNombre}\nFecha y hora: ${this.fechaHoraActual}\nUbicación: Latitud ${this.latitud}, Longitud ${this.longitud}`;
-    await this.presentAlert('¡Asistencia confirmada!', mensaje);
   }
 
   async presentAlert(titulo: string, mensaje: string) {
-    const alert = await this.alertController.create({
-      header: titulo,
-      message: mensaje,
-      buttons: ['OK']
-    });
-    await alert.present();
-  }
-}
+      const alert = await this.alertController.create({
+        header: titulo,
+        message: mensaje,
+        buttons: ['OK']
+      });
+      await alert.present();
+    }
+  } 

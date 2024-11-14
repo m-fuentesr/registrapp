@@ -6,6 +6,8 @@ import { AlertController } from '@ionic/angular';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { lastValueFrom } from 'rxjs';
+import { AuthService } from 'src/app/services/auth.service';
+import { Network } from '@capacitor/network';
 
 @Component({
   selector: 'app-login-docente',
@@ -25,6 +27,7 @@ export class LoginDocentePage implements OnInit {
     private dbstorage: StorageService,
     private firestore: AngularFirestore,
     private afAuth: AngularFireAuth,
+    private authService: AuthService,
     private alertController: AlertController
   ) {}
 
@@ -33,33 +36,51 @@ export class LoginDocentePage implements OnInit {
   async iniciarSesion() {
     console.log("Submit del formulario");
 
-    try {
-      const userCredential = await this.afAuth.signInWithEmailAndPassword(this.usr.email, this.usr.password);
-      const storedUser = userCredential.user; // Recuperar el usuario almacenado
+    // Verificar si hay conexión de red
+    const networkStatus = await Network.getStatus();
+    if (networkStatus.connected) {
+      try {
+        // Intentar iniciar sesión con Firebase
+        const userCredential = await this.afAuth.signInWithEmailAndPassword(this.usr.email, this.usr.password);
+        const storedUser = userCredential.user;
 
-      // Verificar si el usuario existe y las credenciales son correctas
-      if (storedUser) {
+        // Verificar si el usuario existe
+        if (storedUser) {
+          // Obtener el tipo de usuario desde Firestore
+          const userDoc = await lastValueFrom(this.firestore.collection('usuarios').doc(storedUser.uid).get());
+          console.log('¡Autorizado!');
 
-        // Obtener el tipo de usuario desde Firestore
-        const userDoc = await lastValueFrom(this.firestore.collection('usuarios').doc(storedUser.uid).get());
-        console.log('¡Autorizado!');
+          if (userDoc.exists) {
+            const userData: any = userDoc.data();
 
-        if (userDoc.exists) {
-          const userData: any = userDoc.data();
-
-          // Verificar que el tipo de usuario sea 'docente'
-          if (userData['tipo'] === 'docente') {
-            this.router.navigate(['/home-docente']); // Redirigir a home si es docente
-          } else {
-            // Si es un alumno, mostrar alerta
-            this.mostrarAlerta('Acceso denegado', 'Solo los docentes pueden acceder a esta página.');
-          }
-        }  
+            // Verificar que el tipo de usuario sea 'alumno'
+            if (userData['tipo'] === 'docente') {
+              // Guardar datos del usuario en el almacenamiento local
+              await this.authService.saveUserLocally({
+                uid: storedUser.uid,
+                email: this.usr.email,
+                tipo: userData['tipo']
+              });
+              this.router.navigate(['/home-docente']); // Redirigir a home si es docente
+            } else {
+              // Mostrar alerta si el usuario no es un docente
+              this.mostrarAlerta('Acceso denegado', 'Solo los docentes pueden acceder a esta página.');
+            }
+          }  
+        }
+      } catch (error) {
+        // Mostrar alerta si las credenciales son incorrectas
+        this.mostrarAlerta('Credenciales incorrectas', 'Por favor, intente de nuevo.');
       }
-
-    } catch (error) {
-      // Si las credenciales son incorrectas, mostrar alerta
-      this.mostrarAlerta('Credenciales incorrectas', 'Por favor, intente de nuevo.');
+    } else {
+      // Sin conexión: intentar cargar usuario desde almacenamiento local
+      const localUser = await this.authService.getUserFromLocalStorage();
+      
+      if (localUser && localUser.email === this.usr.email && localUser.tipo === 'docente') {
+        this.router.navigate(['/home-docente']);
+      } else {
+        this.mostrarAlerta('Acceso sin conexión', 'No se encontraron datos locales. Inicie sesión en línea al menos una vez.');
+      }
     }
   }
 

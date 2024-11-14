@@ -4,6 +4,8 @@ import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { ActivatedRoute } from '@angular/router';
 import { AlertController } from '@ionic/angular';
+import { Network } from '@capacitor/network';
+import { Storage } from '@ionic/storage-angular';
 
 @Component({
   selector: 'app-asignaturas-docente',
@@ -24,6 +26,7 @@ export class AsignaturasDocentePage implements OnInit {
   constructor(
     private firestore: AngularFirestore,
     private afAuth: AngularFireAuth,
+    private storage: Storage,
     private route: ActivatedRoute,
     private alertController: AlertController
   ) { }
@@ -153,6 +156,11 @@ export class AsignaturasDocentePage implements OnInit {
     };
 
     try {
+      // Verificar estado de conexión
+    const status = await Network.getStatus();
+    
+    if (status.connected) {
+      // Si hay conexión, intenta obtener el documento en Firestore
       const claseRef = this.obtenerClaseFirestore(this.asignaturaId, this.claseSeleccionada);
       const claseData = await claseRef.get().toPromise();
 
@@ -165,20 +173,36 @@ export class AsignaturasDocentePage implements OnInit {
       // Genera el código QR
       this.qrCodeUrl = await QRCode.toDataURL(JSON.stringify(datosClase));
 
+      // Guarda el código QR en Firestore
       await claseRef.set({
         ...datosClase,
         qrCodeUrl: this.qrCodeUrl
       });
 
       console.log('Código QR guardado y generado:', this.qrCodeUrl);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error('Error generando o guardando el código QR:', error.message);
-      } else {
-        console.error('Error generando o guardando el código QR:', error);
-      }
+    } else {
+      // Si no hay conexión, guarda en localStorage
+      console.log('Sin conexión. Guardando datos de QR para sincronización posterior.');
+      this.qrCodeUrl = await QRCode.toDataURL(JSON.stringify(datosClase));
+
+      const qrsPendientes = (await this.storage.get('qrsPendientes')) || [];
+      qrsPendientes.push({
+        ...datosClase,
+        qrCodeUrl: this.qrCodeUrl
+      });
+
+      await this.storage.set('qrsPendientes', qrsPendientes);
+      console.log('Código QR guardado localmente.');
+    }
+
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error generando o guardando el código QR:', error.message);
+    } else {
+      console.error('Error generando o guardando el código QR:', error);
     }
   }
+}
 
   async mostrarAlerta(titulo: string, mensaje: string) {
     const alert = await this.alertController.create({

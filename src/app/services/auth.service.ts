@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { AlertController } from '@ionic/angular';
+import { Storage } from '@ionic/storage-angular';
 
 @Injectable({
   providedIn: 'root'
@@ -9,9 +10,16 @@ import { AlertController } from '@ionic/angular';
 export class AuthService {
 
   constructor(
-    private afAuth: AngularFireAuth, 
+    private afAuth: AngularFireAuth,
     private alertController: AlertController,
-    private firestore: AngularFirestore) { }
+    private firestore: AngularFirestore,
+    private storage: Storage) {
+    this.initStorage();
+  }
+
+  async initStorage() {
+    await this.storage.create();
+  }
 
   // Método para registrar usuarios
   async register(email: string, password: string, userData: any) {
@@ -37,6 +45,20 @@ export class AuthService {
     try {
       const userCredential = await this.afAuth.signInWithEmailAndPassword(email, password);
       console.log('Usuario logueado:', userCredential.user);
+
+      // Obtener datos adicionales del usuario desde Firestore
+      const userDoc = await this.firestore.collection('usuarios').doc(userCredential.user?.uid).get().toPromise();
+      const userData = userDoc?.data();
+
+      if (userData) {
+        // Guardar los datos del usuario en el almacenamiento local
+        await this.saveUserLocally({
+          uid: userCredential.user?.uid,
+          email: userCredential.user?.email,
+          ...userData
+        });
+      }
+
       return userCredential.user;
     } catch (error) {
       console.error('Error en login:', error);
@@ -76,5 +98,23 @@ export class AuthService {
     });
     await alert.present();
   }
-  
+
+  // Guardar datos del usuario en el almacenamiento local
+  async saveUserLocally(userData: any) {
+    await this.storage.set('user', userData);
+  }
+
+  // Obtener datos del usuario desde el almacenamiento local
+  async getUserFromLocalStorage() {
+    return await this.storage.get('user');
+  }
+
+  async syncUserData() {
+    const localUser = await this.getUserFromLocalStorage();
+    if (localUser) {
+      // Sincroniza datos con Firestore
+      await this.firestore.collection('usuarios').doc(localUser.email).set(localUser, { merge: true });
+    }
+  }
+
 }
