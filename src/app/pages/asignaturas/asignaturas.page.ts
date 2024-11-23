@@ -28,7 +28,6 @@ export class AsignaturasPage implements OnInit {
   seccion: any = {};
   claseNombre: string = '';
   asignaturaId: string = '';
-  claseSeleccionada: string = '';
 
   constructor(
     private alertController: AlertController,
@@ -181,7 +180,9 @@ export class AsignaturasPage implements OnInit {
       const status = await Network.getStatus();
       if (status.connected) {
         // Si hay conexión, guarda directamente en Firestore
-        const alumnoRef = this.firestore.collection('asistencia').doc(this.alumnoId).collection(this.asignaturaId).doc(this.claseSeleccionada);
+        console.log('alumnoId:', this.alumnoId);
+        console.log('asignaturaId:', this.asignaturaId);
+        const alumnoRef = this.firestore.collection('asistencia').doc(this.alumnoId);
         const doc = await alumnoRef.get().toPromise();
 
         if (doc?.exists) {
@@ -222,6 +223,7 @@ export class AsignaturasPage implements OnInit {
       await this.presentAlert('¡Asistencia confirmada!', mensaje);
     
     } catch (error) {
+      console.error('Error al obtener la ubicación:', error);
       await this.presentAlert('Error de ubicación', 'No se pudo obtener la ubicación.');
       return;
     }
