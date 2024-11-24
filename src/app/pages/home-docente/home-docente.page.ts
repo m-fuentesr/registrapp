@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
+import { IonModal } from '@ionic/angular';
 
 @Component({
   selector: 'app-home-docente',
@@ -11,6 +12,9 @@ import { AngularFireAuth } from '@angular/fire/compat/auth';
 export class HomeDocentePage implements OnInit {
 
   asignaturas: any[] = [];
+  mostrarFormularioCrear = false;
+  nuevaAsignatura = { nombre: '', secciones: {} };
+  nuevaSeccion = { nombre: '' };
 
   profileMenuButtons = [
     {
@@ -73,6 +77,53 @@ export class HomeDocentePage implements OnInit {
             })
             .filter((asignatura: any) => asignatura !== null);
         });
+      }
+    }).catch(error => {
+      console.error("Error al obtener el usuario:", error);
+    });
+  }
+  
+  cerrarFormularioCrear() {
+    this.nuevaAsignatura = { nombre: '', secciones: {} };
+    this.nuevaSeccion = { nombre: '' };
+  }
+
+  cerrarModal(modal: IonModal) {
+    modal.dismiss();
+    this.cerrarFormularioCrear();
+  }
+
+  crearAsignatura(modal?:IonModal) {
+    this.afAuth.currentUser.then(user => {
+      if (user) {
+        const docenteId = user.uid;
+  
+        const nuevaAsignaturaData = {
+          nombre: this.nuevaAsignatura.nombre,
+          secciones: {
+            [this.nuevaSeccion.nombre]: {
+              nombre: this.nuevaSeccion.nombre,
+              docenteId: docenteId,
+            }
+          }
+        };
+  
+        this.firestore.collection('asignaturas').add(nuevaAsignaturaData)
+          .then(() => {
+            console.log('Asignatura creada con éxito');
+            this.nuevaAsignatura = { nombre: '', secciones: {} };
+            this.nuevaSeccion = { nombre: '' };
+            if (modal) {
+              modal.dismiss().then(() => {
+                this.obtenerAsignaturas(); // Refresca las asignaturas
+              });
+            } else {
+              this.obtenerAsignaturas();
+            }
+          })
+          .catch(error => {
+            console.error('Error al crear asignatura:', error);
+          });
       }
     }).catch(error => {
       console.error("Error al obtener el usuario:", error);

@@ -31,5 +31,40 @@
     </ion-accordion>
   </ion-accordion-group>
 
+  <ion-button expand="block" id="crearAsignaturaButton">
+    Crear Asignatura
+  </ion-button>
+
+  <ion-modal trigger="crearAsignaturaButton" #crearAsignaturaModal>
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Crear Asignatura</ion-title>
+          <ion-buttons slot="start">
+            <ion-button (click)="cerrarModal(crearAsignaturaModal)">
+              <ion-icon slot="icon-only" color="primary" name="chevron-back"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content>
+        <form (ngSubmit)="crearAsignatura(crearAsignaturaModal)" #form="ngForm">
+          <ion-item>
+            <ion-label position="floating">Nombre de la asignatura</ion-label>
+            <ion-input [(ngModel)]="nuevaAsignatura.nombre" name="nombre" required></ion-input>
+          </ion-item>
+  
+          <ion-item>
+            <ion-label position="floating">Nombre de la sección</ion-label>
+            <ion-input [(ngModel)]="nuevaSeccion.nombre" name="nombreSeccion" required></ion-input>
+          </ion-item>
+  
+          <ion-button type="submit" expand="block" class="ion-padding" [disabled]="!form.valid">Guardar</ion-button>
+        </form>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+  
+
 </ion-content>
 
