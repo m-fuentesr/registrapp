@@ -4,8 +4,8 @@ import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { ActivatedRoute } from '@angular/router';
 import { AlertController } from '@ionic/angular';
-import { Network } from '@capacitor/network';
 import { Storage } from '@ionic/storage-angular';
+import { ChangeDetectorRef } from '@angular/core';
 
 @Component({
   selector: 'app-asignaturas-docente',
@@ -15,12 +15,12 @@ import { Storage } from '@ionic/storage-angular';
 export class AsignaturasDocentePage implements OnInit {
   alumnos: any[] = [];
   qrCodeUrl: string = '';
-  claseSeleccionada: string = '';
+  claseSeleccionada: any = null;
   docenteId: string = '';
   asignaturaId: string = '';
   asignaturaNombre: string = '';
   seccion: any = {};
-  clasesDisponibles: any[] = [];
+  clasesGeneradas: any[] = [];
   totalClases: number = 0;
 
   constructor(
@@ -28,7 +28,8 @@ export class AsignaturasDocentePage implements OnInit {
     private afAuth: AngularFireAuth,
     private storage: Storage,
     private route: ActivatedRoute,
-    private alertController: AlertController
+    private alertController: AlertController,
+    private cdr: ChangeDetectorRef,
   ) { }
 
   ngOnInit() {
@@ -38,6 +39,8 @@ export class AsignaturasDocentePage implements OnInit {
       const seccionNombre = params['seccion'];
       if (this.asignaturaId && seccionNombre) {
         this.obtenerSeccionYClases(seccionNombre);
+        this.obtenerClasesGeneradas();
+        this.sincronizarDatosOffline();
       }
     });
 
@@ -48,161 +51,157 @@ export class AsignaturasDocentePage implements OnInit {
     });
   }
 
-  obtenerAlumnos() {
-    this.firestore.collection('asignaturas').doc(this.asignaturaId).valueChanges().subscribe((asignatura: any) => {
-      if (asignatura && asignatura.secciones && asignatura.secciones[this.seccion?.nombre]) {
-        const alumnosRegistrados = asignatura.secciones[this.seccion?.nombre].alumnos;
-
-        this.obtenerDetallesAlumnos(alumnosRegistrados).then(alumnosDetallados => {
-          this.alumnos = alumnosDetallados;
-
-          this.firestore.collection('asistencia').valueChanges().subscribe((asistencias: any[]) => {
-            this.alumnos.forEach(alumno => {
-              const asistencia = asistencias.find(a => a.alumnoId === alumno.alumnoId);
-              if (asistencia) {
-                alumno.clasesAsistidas = asistencia.clasesAsistidas;
-                alumno.porcentajeAsistencia = asistencia.porcentajeAsistencia;
-              }
-            });
-          });
-        });
-      } else {
-        console.error('Sección no encontrada en la asignatura.');
-      }
-    });
-  }
-  
-  private async obtenerDetallesAlumnos(alumnosRegistrados: any[]): Promise<any[]> {
-    return Promise.all(alumnosRegistrados.map(async (alumno: any) => {
-      const usuarioDoc = await this.firestore.collection('usuarios').doc(alumno.alumnoId).get().toPromise();
-      const usuarioData: any = usuarioDoc?.data();
-  
-      return {
-        alumnoId: alumno.alumnoId,
-        nombre: usuarioData ? `${usuarioData.firstName} ${usuarioData.lastName}` : 'Nombre desconocido',
-        clasesAsistidas: 0,
-        porcentajeAsistencia: 0
-      };
-    }));
-  }
-  
-
   obtenerSeccionYClases(seccionNombre: string) {
-    if (!this.asignaturaId || !seccionNombre) {
-      console.error('Asignatura o sección no están definidos.');
-      return;
-    }
-  
-    this.firestore.collection('asignaturas').doc(this.asignaturaId).valueChanges().subscribe((asignatura: any) => {
-      if (asignatura && asignatura.secciones) {
-        this.asignaturaNombre = asignatura.nombre;
-        const seccion = asignatura.secciones[seccionNombre];
-  
-        if (seccion) {
-          this.seccion = seccion;
-          this.clasesDisponibles = Array.isArray(this.seccion.clases) ? this.seccion.clases : [];
-          this.totalClases = this.clasesDisponibles.length;
+    this.firestore
+      .collection('asignaturas')
+      .doc(this.asignaturaId)
+      .valueChanges()
+      .subscribe((asignatura: any) => {
+        if (asignatura && asignatura.secciones) {
+          this.asignaturaNombre = asignatura.nombre;
+          this.seccion = asignatura.secciones[seccionNombre];
+          this.clasesGeneradas = this.seccion?.clases || [];
+          console.log('Clases generadas:', this.clasesGeneradas);
           this.obtenerAlumnos();
         } else {
-          console.error('Sección no encontrada.');
+          console.error('No se encontró la asignatura o la sección.');
         }
-      } else {
-        console.error('No se encontró la asignatura o el campo "secciones" no existe.');
-      }
-    });
-  }
-  
-
-  private obtenerClaseFirestore(asignaturaId: string, claseId: string) {
-    console.log(`Obteniendo clase en Firestore para asignaturaId: ${asignaturaId}, claseId: ${claseId}`);
-    return this.firestore.collection('asignaturas').doc(asignaturaId)
-      .collection('clases').doc(claseId);
+      });
   }
 
-  onClaseSeleccionada(claseId: string) {
-    this.claseSeleccionada = claseId;
-    this.obtenerClaseGuardada();
+  obtenerClasesGeneradas() {
+    this.firestore
+      .collection('asignaturas')
+      .doc(this.asignaturaId)
+      .valueChanges()
+      .subscribe((asignatura: any) => {
+        if (asignatura?.secciones?.[this.seccion.nombre]?.clases) {
+          this.clasesGeneradas = asignatura.secciones[this.seccion.nombre].clases;
+          this.totalClases = this.clasesGeneradas.length;
+          console.log('Clases generadas:', this.clasesGeneradas);
+        } else {
+          console.log('No hay clases generadas para esta sección.');
+          this.clasesGeneradas = [];
+          this.totalClases = 0;
+        }
+      });
   }
 
-  async obtenerClaseGuardada() {
-    if (!this.claseSeleccionada || !this.asignaturaId) {
-      console.error('Faltan datos de asignatura o clase para cargar el código QR.');
-      return;
-    }
+  obtenerAlumnos() {
+    this.firestore
+      .collection('asignaturas')
+      .doc(this.asignaturaId)
+      .valueChanges()
+      .subscribe((asignatura: any) => {
+        if (asignatura?.secciones?.[this.seccion.nombre]?.alumnos) {
+          const alumnosRegistrados = asignatura.secciones[this.seccion.nombre].alumnos;
+          this.obtenerDetallesAlumnos(alumnosRegistrados).then(alumnosDetallados => {
+            this.alumnos = alumnosDetallados;
 
-    const claseRef = this.obtenerClaseFirestore(this.asignaturaId, this.claseSeleccionada);
-    claseRef.valueChanges().subscribe((claseData: any) => {
-      // Verificar si claseData está definido antes de acceder a su propiedad qrCodeUrl
-      if (claseData && claseData.qrCodeUrl) {
-        this.qrCodeUrl = claseData.qrCodeUrl;
-      } else {
-        this.qrCodeUrl = ''; // Si no hay qrCodeUrl, lo dejamos vacío
-      }
-    });
+            // Relacionar asistencia de Firestore
+            this.firestore.collection('asistencia').valueChanges().subscribe((asistencias: any[]) => {
+              this.alumnos.forEach(alumno => {
+                const asistencia = asistencias.find(a => a.alumnoId === alumno.alumnoId);
+                if (asistencia) {
+                  alumno.clasesAsistidas = asistencia.clasesAsistidas || 0;
+                  alumno.porcentajeAsistencia = asistencia.porcentajeAsistencia || 0;
+                }
+              });
+            });
+          });
+        }
+      });
+  }
+
+  private async obtenerDetallesAlumnos(alumnosRegistrados: any[]): Promise<any[]> {
+    return Promise.all(
+      alumnosRegistrados.map(async (alumno: any) => {
+        const usuarioDoc = await this.firestore.collection('usuarios').doc(alumno.alumnoId).get().toPromise();
+        const usuarioData: any = usuarioDoc?.data();
+        return {
+          alumnoId: alumno.alumnoId,
+          nombre: usuarioData ? `${usuarioData.firstName} ${usuarioData.lastName}` : 'Nombre desconocido',
+          clasesAsistidas: 0,
+          porcentajeAsistencia: 0,
+        };
+      }),
+    );
   }
 
   async generarCodigoQR() {
-    if (!this.claseSeleccionada || !this.asignaturaId || !this.seccion?.nombre) {
-      console.error('Debe seleccionar una clase.');
-      return;
+    const fechaActual = new Date().toISOString().split('T')[0];
+    const qrExistente = this.clasesGeneradas.find(clase => clase.fecha === fechaActual);
+
+    if (qrExistente) {
+      const confirmacion = await this.mostrarConfirmacion(
+        'Código QR existente',
+        `Ya existe un QR para hoy (${fechaActual}). ¿Deseas generar otro?`
+      );
+      if (!confirmacion) return;
     }
 
+    const nombreClase = `Clase ${this.clasesGeneradas.length + 1}`;
     const datosClase = {
       asignatura: this.asignaturaId,
-      seccion: this.seccion.nombre,
-      clase: this.claseSeleccionada,
-      fecha: new Date().toISOString(),
-      docenteId: this.docenteId
+      seccion: this.seccion?.nombre,
+      nombre: nombreClase,
+      fecha: fechaActual,
+      docenteId: this.docenteId,
     };
 
     try {
-      // Verificar estado de conexión
-    const status = await Network.getStatus();
-    
-    if (status.connected) {
-      // Si hay conexión, intenta obtener el documento en Firestore
-      const claseRef = this.obtenerClaseFirestore(this.asignaturaId, this.claseSeleccionada);
-      const claseData = await claseRef.get().toPromise();
-
-      if (claseData && claseData.exists && claseData.data()?.['qrCodeUrl']) {
-        console.log('Código QR ya existe para esta clase');
-        await this.mostrarAlerta('Código QR existente', 'Ya existe un código QR generado para esta clase.');
-        return;
-      }
-
-      // Genera el código QR
       this.qrCodeUrl = await QRCode.toDataURL(JSON.stringify(datosClase));
+      this.cdr.detectChanges();
+      console.log('Código QR generado:', this.qrCodeUrl);
 
-      // Guarda el código QR en Firestore
-      await claseRef.set({
-        ...datosClase,
-        qrCodeUrl: this.qrCodeUrl
+      // Guardar datos de la clase
+      const nuevaClase = { ...datosClase, qrCodeUrl: this.qrCodeUrl };
+      this.clasesGeneradas.push(nuevaClase);
+
+      // Actualizar en Firestore
+      await this.firestore.collection('asignaturas').doc(this.asignaturaId).update({
+        [`secciones.${this.seccion.nombre}.clases`]: this.clasesGeneradas,
       });
 
-      console.log('Código QR guardado y generado:', this.qrCodeUrl);
-    } else {
-      // Si no hay conexión, guarda en localStorage
-      console.log('Sin conexión. Guardando datos de QR para sincronización posterior.');
-      this.qrCodeUrl = await QRCode.toDataURL(JSON.stringify(datosClase));
-
-      const qrsPendientes = (await this.storage.get('qrsPendientes')) || [];
-      qrsPendientes.push({
-        ...datosClase,
-        qrCodeUrl: this.qrCodeUrl
-      });
-
-      await this.storage.set('qrsPendientes', qrsPendientes);
-      console.log('Código QR guardado localmente.');
-    }
-
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Error generando o guardando el código QR:', error.message);
-    } else {
-      console.error('Error generando o guardando el código QR:', error);
+      await this.mostrarAlerta('QR Generado', `Clase: ${nombreClase}, Fecha: ${fechaActual}`);
+    } catch (error) {
+      console.error('Error al generar el código QR:', error);
+      await this.mostrarAlerta('Error', 'Hubo un problema al generar el QR. Inténtalo de nuevo.');
     }
   }
-}
+
+  async sincronizarDatosOffline() {
+    const clasesOffline = await this.storage.get('clasesOffline');
+    if (clasesOffline?.length > 0) {
+      try {
+        const clasesActualizadas = [...this.clasesGeneradas, ...clasesOffline];
+        await this.firestore.collection('asignaturas').doc(this.asignaturaId).update({
+          [`secciones.${this.seccion.nombre}.clases`]: clasesActualizadas,
+        });
+
+        await this.storage.remove('clasesOffline');
+        this.clasesGeneradas = clasesActualizadas;
+        this.totalClases = clasesActualizadas.length;
+        console.log('Clases offline sincronizadas con Firestore.');
+      } catch (error) {
+        console.error('Error al sincronizar clases offline:', error);
+      }
+    }
+  }
+
+  async procesarCodigoqrSinConexion(datosClase: any) {
+    const clasesOffline = await this.storage.get('clasesOffline') || [];
+    clasesOffline.push(datosClase);
+    await this.storage.set('clasesOffline', clasesOffline);
+    console.log('Clase almacenada offline:', datosClase);
+  }
+
+  onClaseSeleccionada(clase: any) {
+    this.claseSeleccionada = clase;
+    this.qrCodeUrl = clase?.qrCodeUrl || '';
+    console.log('Clase seleccionada:', this.claseSeleccionada);
+    console.log('Código QR cargado:', this.qrCodeUrl);
+  }
 
   async mostrarAlerta(titulo: string, mensaje: string) {
     const alert = await this.alertController.create({
@@ -211,5 +210,26 @@ export class AsignaturasDocentePage implements OnInit {
       buttons: ['OK']
     });
     await alert.present();
+  }
+
+  async mostrarConfirmacion(titulo: string, mensaje: string): Promise<boolean> {
+    return new Promise(async resolve => {
+      const alert = await this.alertController.create({
+        header: titulo,
+        message: mensaje,
+        buttons: [
+          {
+            text: 'Cancelar',
+            role: 'cancel',
+            handler: () => resolve(false),
+          },
+          {
+            text: 'Aceptar',
+            handler: () => resolve(true),
+          },
+        ],
+      });
+      await alert.present();
+    });
   }
 }

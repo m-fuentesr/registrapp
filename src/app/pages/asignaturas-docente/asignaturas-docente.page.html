@@ -9,10 +9,10 @@
     </ion-label>
   </ion-item>
 
-  <ion-item>
-    <ion-label>Selecciona la clase:</ion-label>
+  <ion-item *ngIf="clasesGeneradas.length > 0">
+    <ion-label>Clases generadas:</ion-label>
     <ion-select [(ngModel)]="claseSeleccionada" (ionChange)="onClaseSeleccionada(claseSeleccionada)">
-      <ion-select-option *ngFor="let clase of clasesDisponibles" [value]="clase.nombre">
+      <ion-select-option *ngFor="let clase of clasesGeneradas" [value]="clase">
         {{ clase.nombre }} - {{ clase.fecha }}
       </ion-select-option>
     </ion-select>
@@ -34,7 +34,7 @@
     </ion-item>
   </ion-list>
 
-  <ion-button expand="block" color="primary" (click)="generarCodigoQR()" [disabled]="!claseSeleccionada">
+  <ion-button expand="block" color="primary" (click)="generarCodigoQR()">
     Generar Código QR
   </ion-button>
 
