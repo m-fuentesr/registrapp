@@ -6,6 +6,7 @@ import { ActivatedRoute } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { Storage } from '@ionic/storage-angular';
 import { ChangeDetectorRef } from '@angular/core';
+import { Network } from '@capacitor/network';
 
 @Component({
   selector: 'app-asignaturas-docente',
@@ -33,6 +34,7 @@ export class AsignaturasDocentePage implements OnInit {
   ) { }
 
   ngOnInit() {
+    this.initStorage();
     this.route.queryParams.subscribe(params => {
       console.log('Parametros de la ruta:', params);
       this.asignaturaId = params['asignaturaId'] || '';
@@ -44,6 +46,10 @@ export class AsignaturasDocentePage implements OnInit {
       }
     });
 
+    Network.addListener('networkStatusChange', () => {
+      this.sincronizarDatosOffline();
+    });
+
     this.afAuth.authState.subscribe(user => {
       if (user) {
         this.docenteId = user.uid;
@@ -51,41 +57,90 @@ export class AsignaturasDocentePage implements OnInit {
     });
   }
 
-  obtenerSeccionYClases(seccionNombre: string) {
-    this.firestore
-      .collection('asignaturas')
-      .doc(this.asignaturaId)
-      .valueChanges()
-      .subscribe((asignatura: any) => {
-        if (asignatura && asignatura.secciones) {
-          this.asignaturaNombre = asignatura.nombre;
-          this.seccion = asignatura.secciones[seccionNombre];
-          this.clasesGeneradas = this.seccion?.clases || [];
-          console.log('Clases generadas:', this.clasesGeneradas);
-          this.obtenerAlumnos();
-        } else {
-          console.error('No se encontró la asignatura o la sección.');
-        }
-      });
+  private async initStorage() {
+    await this.storage.create();
   }
 
-  obtenerClasesGeneradas() {
-    this.firestore
-      .collection('asignaturas')
-      .doc(this.asignaturaId)
-      .valueChanges()
-      .subscribe((asignatura: any) => {
-        if (asignatura?.secciones?.[this.seccion.nombre]?.clases) {
-          this.clasesGeneradas = asignatura.secciones[this.seccion.nombre].clases;
-          this.totalClases = this.clasesGeneradas.length;
-          console.log('Clases generadas:', this.clasesGeneradas);
-        } else {
-          console.log('No hay clases generadas para esta sección.');
+  async obtenerSeccionYClases(seccionNombre: string) {
+    const seccionOffline = await this.storage.get('seccionOffline'); // Verifica si hay datos offline guardados
+    console.log('Datos offline:', seccionOffline);
+    if (navigator.onLine) {
+      // Si hay conexión a Internet, cargar desde Firestore
+      this.firestore
+        .collection('asignaturas')
+        .doc(this.asignaturaId)
+        .valueChanges()
+        .subscribe(async (asignatura: any) => {
+          if (asignatura && asignatura.secciones) {
+            this.asignaturaNombre = asignatura.nombre;
+            this.seccion = asignatura.secciones[seccionNombre];
+            this.clasesGeneradas = this.seccion?.clases || [];
+            console.log('Clases generadas desde Firestore:', this.clasesGeneradas);
+
+            // Guardar las clases obtenidas en Ionic Storage para acceso offline
+            await this.storage.set('seccionOffline', {
+              asignatura: asignatura.nombre,
+              clases: this.seccion?.clases,
+              nombre: this.seccion?.nombre
+            });
+            console.log('Datos guardados en storage:', this.seccion);
+            this.obtenerAlumnos();
+          } else {
+            console.error('No se encontró la asignatura o la sección.');
+          }
+        });
+    } else {
+      // Si no hay conexión, cargar desde el almacenamiento local (Offline)
+      if (seccionOffline) {
+        this.asignaturaNombre = seccionOffline.asignatura;
+        this.seccion = seccionOffline;
+        this.clasesGeneradas = this.seccion?.clases || [];
+        console.log('Clases generadas desde almacenamiento local:', this.clasesGeneradas);
+        this.obtenerAlumnos();
+      } else {
+        console.error('No hay datos de la sección disponibles offline.');
+      }
+    }
+  }
+
+  async obtenerClasesGeneradas() {
+    const status = await Network.getStatus();
+    if (status.connected) {
+      // Recuperar desde Firestore
+      this.firestore
+        .collection('asignaturas')
+        .doc(this.asignaturaId)
+        .valueChanges()
+        .subscribe((asignatura: any) => {
+          if (asignatura?.secciones?.[this.seccion.nombre]?.clases) {
+            this.clasesGeneradas = asignatura.secciones[this.seccion.nombre].clases;
+            this.totalClases = this.clasesGeneradas.length;
+          } else {
+            this.clasesGeneradas = [];
+            this.totalClases = 0;
+          }
+        });
+      } else {
+        // Recuperar clases desde almacenamiento local si no hay conexión
+        try {
+          const seccionOffline = await this.storage.get('seccionOffline');
+          if (seccionOffline) {
+            this.clasesGeneradas = seccionOffline.clases || [];
+            this.totalClases = this.clasesGeneradas.length;
+            console.log('Clases generadas desde almacenamiento local:', this.clasesGeneradas);
+          } else {
+            this.clasesGeneradas = [];
+            this.totalClases = 0;
+            console.log('No hay clases almacenadas offline.');
+          }
+        } catch (error) {
+          console.error('Error al obtener clases offline:', error);
           this.clasesGeneradas = [];
           this.totalClases = 0;
         }
-      });
-  }
+      }
+    }
+
 
   obtenerAlumnos() {
     this.firestore
@@ -158,10 +213,18 @@ export class AsignaturasDocentePage implements OnInit {
       const nuevaClase = { ...datosClase, qrCodeUrl: this.qrCodeUrl };
       this.clasesGeneradas.push(nuevaClase);
 
-      // Actualizar en Firestore
-      await this.firestore.collection('asignaturas').doc(this.asignaturaId).update({
-        [`secciones.${this.seccion.nombre}.clases`]: this.clasesGeneradas,
-      });
+      if (await Network.getStatus().then(status => !status.connected)) {
+        // Si no hay conexión, guardar la clase offline
+        const clasesOffline = await this.storage.get('clasesOffline') || [];
+        clasesOffline.push(nuevaClase);
+        await this.storage.set('clasesOffline', clasesOffline);
+        console.log('Clase guardada offline:', nuevaClase);
+      } else {
+        // Si hay conexión, guardar en Firestore
+        await this.firestore.collection('asignaturas').doc(this.asignaturaId).update({
+          [`secciones.${this.seccion.nombre}.clases`]: this.clasesGeneradas,
+        });
+      }
 
       await this.mostrarAlerta('QR Generado', `Clase: ${nombreClase}, Fecha: ${fechaActual}`);
     } catch (error) {
@@ -171,17 +234,22 @@ export class AsignaturasDocentePage implements OnInit {
   }
 
   async sincronizarDatosOffline() {
-    const clasesOffline = await this.storage.get('clasesOffline');
-    if (clasesOffline?.length > 0) {
+    const status = await Network.getStatus();
+    if (!status.connected) return; // Solo sincronizar si hay conexión
+
+    const clasesOffline = await this.storage.get('clasesOffline') || [];
+    if (clasesOffline.length > 0) {
       try {
         const clasesActualizadas = [...this.clasesGeneradas, ...clasesOffline];
         await this.firestore.collection('asignaturas').doc(this.asignaturaId).update({
           [`secciones.${this.seccion.nombre}.clases`]: clasesActualizadas,
         });
 
+        // Eliminar datos locales sincronizados
         await this.storage.remove('clasesOffline');
         this.clasesGeneradas = clasesActualizadas;
         this.totalClases = clasesActualizadas.length;
+
         console.log('Clases offline sincronizadas con Firestore.');
       } catch (error) {
         console.error('Error al sincronizar clases offline:', error);
