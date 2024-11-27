@@ -1,7 +1,6 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { Usuario } from 'src/app/interfaces/usuario';
-import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { StorageService } from 'src/app/services/dbstorage.service';
 import { AuthService } from 'src/app/services/auth.service';
 
@@ -34,8 +33,7 @@ export class RegistroPage {
   constructor(
     private router: Router,
     private dbstorage: StorageService,
-    private authService: AuthService,
-    private firestore: AngularFirestore
+    private authService: AuthService
   ) {}
 
   // Método de validación
@@ -89,32 +87,48 @@ export class RegistroPage {
   // Método para registrar el usuario
   async registrarUsuario() {
     if (this.validarDatos()) { // Solo intenta registrar si los datos son válidos
+      const userData = {
+        firstName: this.usr.firstName,
+        lastName: this.usr.lastName,
+        email: this.usr.email,
+        password: this.usr.password,
+        tipo: this.usr.tipo,
+      };
+  
       try {
-        const userData = {
-          firstName: this.usr.firstName,
-          lastName: this.usr.lastName,
-          email: this.usr.email,
-          tipo: this.usr.tipo,
-        };
-
-        // Llamar a 'register' en el servicio de autenticación
-        await this.authService.register(this.usr.email, this.usr.password, userData);
-
-        // Guarda los datos del usuario en el almacenamiento local
-        await this.dbstorage.saveUser(this.usr);
-        console.log('Registro exitoso para:', this.usr.firstName, this.usr.lastName, this.usr.email);
-
-        // Redirige a la página de login correspondiente
-        if (this.usr.tipo === 'alumno') {
-          this.router.navigate(['/login']);
-        } else if (this.usr.tipo === 'docente') {
-          this.router.navigate(['/login-docente']);
+        const status = navigator.onLine; // Verificar si hay conexión
+  
+        if (status) {
+          // Registro online
+          await this.authService.register(this.usr.email, this.usr.password, userData);
+          console.log('Registro exitoso en línea para:', userData);
+  
+          // Redirige al login correspondiente
+          this.redirectAfterRegistration(this.usr.tipo);
+        } else {
+          // Sin conexión: guardar usuario en almacenamiento local para sincronización
+          await this.dbstorage.saveUserOffline(userData);
+          console.log('Usuario guardado localmente para sincronización:', userData);
+  
+          // Informar al usuario sobre el registro offline
+          alert('Registro completado sin conexión. Se sincronizará cuando haya Internet.');
+  
+          // Redirige al login correspondiente
+          this.redirectAfterRegistration(this.usr.tipo);
         }
       } catch (error) {
-        console.error('Error al guardar el usuario:', error);
+        console.error('Error al registrar usuario:', error);
       }
     } else {
       console.log('Error en la validación de los datos.');
+    }
+  }
+  
+  redirectAfterRegistration(tipo: string) {
+    if (tipo === 'alumno') {
+      this.router.navigate(['/login']);
+    } else if (tipo === 'docente') {
+      this.router.navigate(['/login-docente']);
     }
   }
 }

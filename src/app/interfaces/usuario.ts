@@ -1,8 +1,19 @@
 export interface Usuario {
+    uid?: string;
     firstName?: string;      
     lastName?: string;       
     email: string;          
     password: string;      
+    confirmPassword?: string;
+    tipo: 'alumno' | 'docente';
+  }
+
+  export interface FirestoreUsuario {
+    uid?: string;
+    firstName?: string;
+    lastName?: string;
+    email: string;
+    password: string;
     confirmPassword?: string;
     tipo: 'alumno' | 'docente';
   }

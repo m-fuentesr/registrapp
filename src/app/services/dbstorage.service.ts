@@ -43,4 +43,25 @@ export class StorageService {
   async getUser(): Promise<any> {
     return await this.getItem('usuario');
   }
+
+  async saveUserOffline(user: any) {
+    const offlineUsers = (await this.storage.get('offlineUsers')) || [];
+    offlineUsers.push(user);
+    await this.storage.set('offlineUsers', offlineUsers);
+    console.log('Usuarios guardados localmente:', offlineUsers);
+    console.log('Guardando usuario con contraseña:', user.password); 
+  }
+  
+  async getOfflineUsers() {
+    return (await this.storage.get('offlineUsers')) || [];
+  }
+  
+  async clearOfflineUsers() {
+    await this.storage.remove('offlineUsers');
+  }
+
+  async eliminarTodosUsuariosOffline() {
+    await this.storage.set('offlineUsers', []);
+    console.log('Todos los usuarios han sido eliminados.');
+  }
 }

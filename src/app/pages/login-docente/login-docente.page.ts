@@ -19,12 +19,11 @@ export class LoginDocentePage implements OnInit {
   usr: Usuario = {
     email: '',
     password: '',
-    tipo: 'docente' // 'docente' es el valor predeterminado para este login
+    tipo: 'docente' // 'docente' es el valor predeterminado
   };
 
   constructor(
     private router: Router, 
-    private dbstorage: StorageService,
     private firestore: AngularFirestore,
     private afAuth: AngularFireAuth,
     private authService: AuthService,
@@ -40,49 +39,31 @@ export class LoginDocentePage implements OnInit {
     const networkStatus = await Network.getStatus();
     if (networkStatus.connected) {
       try {
-        // Intentar iniciar sesión con Firebase
-        const userCredential = await this.afAuth.signInWithEmailAndPassword(this.usr.email, this.usr.password);
-        const storedUser = userCredential.user;
-
-        // Verificar si el usuario existe
-        if (storedUser) {
-          // Obtener el tipo de usuario desde Firestore
-          const userDoc = await lastValueFrom(this.firestore.collection('usuarios').doc(storedUser.uid).get());
-          console.log('¡Autorizado!');
-
-          if (userDoc.exists) {
-            const userData: any = userDoc.data();
-
-            // Verificar que el tipo de usuario sea 'alumno'
-            if (userData['tipo'] === 'docente') {
-              // Guardar datos del usuario en el almacenamiento local
-              await this.authService.saveUserLocally({
-                uid: storedUser.uid,
-                email: this.usr.email,
-                tipo: userData['tipo']
-              });
-              this.router.navigate(['/home-docente']); // Redirigir a home si es docente
-            } else {
-              // Mostrar alerta si el usuario no es un docente
-              this.mostrarAlerta('Acceso denegado', 'Solo los docentes pueden acceder a esta página.');
-            }
-          }  
+        const tipoCorrecto = await this.authService.login(this.usr.email, this.usr.password, 'docente');
+    
+        if (tipoCorrecto) {
+          this.router.navigate(['/home-docente']);
+        } else {
+          this.mostrarAlerta('Acceso denegado', 'Este usuario no está registrado como docente.');
         }
       } catch (error) {
-        // Mostrar alerta si las credenciales son incorrectas
-        this.mostrarAlerta('Credenciales incorrectas', 'Por favor, intente de nuevo.');
+        console.error('Error en inicio de sesión de docente:', error);
+        this.mostrarAlerta('Error de inicio de sesión', 'Credenciales incorrectas. Intente nuevamente.');
       }
     } else {
       // Sin conexión: intentar cargar usuario desde almacenamiento local
-      const localUser = await this.authService.getUserFromLocalStorage();
+      const localUser = await this.authService.getUserFromLocalStorage(this.usr.email);
       
-      if (localUser && localUser.email === this.usr.email && localUser.tipo === 'docente') {
+      if (localUser && localUser.email === this.usr.email && localUser.password === this.usr.password && localUser.tipo === 'docente') {
+        console.log('Usuario local válido:', localUser);
         this.router.navigate(['/home-docente']);
       } else {
+        console.log('No se encontró un usuario local válido');
         this.mostrarAlerta('Acceso sin conexión', 'No se encontraron datos locales. Inicie sesión en línea al menos una vez.');
       }
     }
   }
+
 
   // Método para mostrar la alerta
   async mostrarAlerta(titulo: string, mensaje: string) {
@@ -98,4 +79,4 @@ export class LoginDocentePage implements OnInit {
   recuperarPassword() {
     this.router.navigate(['/recuperar-password']);
   }
-}
+} 

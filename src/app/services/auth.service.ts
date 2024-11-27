@@ -3,6 +3,7 @@ import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { AlertController } from '@ionic/angular';
 import { Storage } from '@ionic/storage-angular';
+import { FirestoreUsuario, Usuario } from 'src/app/interfaces/usuario';
 
 @Injectable({
   providedIn: 'root'
@@ -41,25 +42,30 @@ export class AuthService {
   }
 
   // Método para iniciar sesión
-  async login(email: string, password: string) {
+  async login(email: string, password: string, tipoEsperado: string): Promise<boolean> {
     try {
       const userCredential = await this.afAuth.signInWithEmailAndPassword(email, password);
-      console.log('Usuario logueado:', userCredential.user);
-
-      // Obtener datos adicionales del usuario desde Firestore
-      const userDoc = await this.firestore.collection('usuarios').doc(userCredential.user?.uid).get().toPromise();
-      const userData = userDoc?.data();
-
-      if (userData) {
-        // Guardar los datos del usuario en el almacenamiento local
-        await this.saveUserLocally({
-          uid: userCredential.user?.uid,
-          email: userCredential.user?.email,
-          ...userData
-        });
+      const user = userCredential.user;
+  
+      if (user) {
+        const userDoc = await this.firestore.collection('usuarios').doc(user.uid).get().toPromise();
+        const userData = userDoc?.data() as FirestoreUsuario;
+  
+        if (userData?.tipo === tipoEsperado) {
+          await this.saveUserLocally({
+            uid: user.uid,
+            email: user.email || '',
+            password: password,
+            tipo: userData.tipo,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+          });
+          return true; // Tipo de usuario correcto
+        }
       }
-
-      return userCredential.user;
+  
+      await this.logout();
+      return false; // Tipo de usuario incorrecto
     } catch (error) {
       console.error('Error en login:', error);
       throw error;
@@ -99,18 +105,61 @@ export class AuthService {
     await alert.present();
   }
 
+  async syncOfflineUsers() {
+    const offlineUsers = await this.storage.get('offlineUsers') || [];
+    console.log('Usuarios offline a sincronizar:', offlineUsers);
+
+    if (offlineUsers.length > 0) {
+      for (const user of offlineUsers) {
+        try {
+          // Intentar guardar cada usuario en Firestore
+          const password = user.password || 'defaultPassword';
+          await this.register(user.email, password, user);
+          console.log(`Usuario sincronizado: ${user.email}`);
+        } catch (error) {
+          console.error(`Error al sincronizar usuario ${user.email}:`, error);
+        }
+      }
+
+      // Limpiar usuarios sincronizados
+      await this.storage.remove('offlineUsers');
+      console.log('Sincronización de usuarios completada.');
+    }
+  }
+
   // Guardar datos del usuario en el almacenamiento local
-  async saveUserLocally(userData: any) {
-    await this.storage.set('user', userData);
+  async saveUserLocally(user: Usuario) {
+    const localUsers: Usuario[] = (await this.storage.get('offlineUsers')) || [];
+    const existingUserIndex = localUsers.findIndex(u => u.email === user.email);
+
+    if (existingUserIndex !== -1) {
+      // Actualizar si ya existe
+      localUsers[existingUserIndex] = { ...localUsers[existingUserIndex], ...user };
+    } else {
+      // Agregar nuevo usuario
+      localUsers.push(user);
+    }
+
+    console.log('Guardando usuario con contraseña:', user.password);
+    await this.storage.set('offlineUsers', localUsers);
+    console.log('Datos guardados correctamente:', localUsers);
   }
 
   // Obtener datos del usuario desde el almacenamiento local
-  async getUserFromLocalStorage() {
-    return await this.storage.get('user');
+  async getUserFromLocalStorage(email: string): Promise<Usuario | null> {
+    const localUsers: Usuario[] = (await this.storage.get('offlineUsers')) || [];
+    const user = localUsers.find((user: Usuario) => user.email === email);
+    if (user) {
+      console.log('Usuario encontrado:', user);
+      return user;
+    } else {
+      console.log('Usuario no encontrado')
+      return null;
+    }
   }
 
-  async syncUserData() {
-    const localUser = await this.getUserFromLocalStorage();
+  async syncUserData(email: string) {
+    const localUser = await this.getUserFromLocalStorage(email);
     if (localUser) {
       // Sincroniza datos con Firestore
       await this.firestore.collection('usuarios').doc(localUser.email).set(localUser, { merge: true });

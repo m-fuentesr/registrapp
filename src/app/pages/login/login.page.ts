@@ -1,11 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { Usuario } from 'src/app/interfaces/usuario';
-import { StorageService } from 'src/app/services/dbstorage.service';
 import { AlertController } from '@ionic/angular';
-import { AngularFirestore } from '@angular/fire/compat/firestore';
-import { AngularFireAuth } from '@angular/fire/compat/auth';
-import { lastValueFrom } from 'rxjs';
 import { AuthService } from 'src/app/services/auth.service';
 import { Network } from '@capacitor/network';
 
@@ -23,9 +19,7 @@ export class LoginPage implements OnInit {
   };
 
   constructor(
-    private router: Router, 
-    private firestore: AngularFirestore,
-    private afAuth: AngularFireAuth,
+    private router: Router,
     private authService: AuthService,
     private alertController: AlertController
   ) {}
@@ -39,45 +33,26 @@ export class LoginPage implements OnInit {
     const networkStatus = await Network.getStatus();
     if (networkStatus.connected) {
       try {
-        // Intentar iniciar sesión con Firebase
-        const userCredential = await this.afAuth.signInWithEmailAndPassword(this.usr.email, this.usr.password);
-        const storedUser = userCredential.user;
-
-        // Verificar si el usuario existe
-        if (storedUser) {
-          // Obtener el tipo de usuario desde Firestore
-          const userDoc = await lastValueFrom(this.firestore.collection('usuarios').doc(storedUser.uid).get());
-          console.log('¡Autorizado!');
-
-          if (userDoc.exists) {
-            const userData: any = userDoc.data();
-
-            // Verificar que el tipo de usuario sea 'alumno'
-            if (userData['tipo'] === 'alumno') {
-              // Guardar datos del usuario en el almacenamiento local
-              await this.authService.saveUserLocally({
-                uid: storedUser.uid,
-                email: this.usr.email,
-                tipo: userData['tipo']
-              });
-              this.router.navigate(['/home']); // Redirigir a home si es alumno
-            } else {
-              // Mostrar alerta si el usuario no es un alumno
-              this.mostrarAlerta('Acceso denegado', 'Solo los alumnos pueden acceder a esta página.');
-            }
-          }  
+        const tipoCorrecto = await this.authService.login(this.usr.email, this.usr.password, 'alumno');
+    
+        if (tipoCorrecto) {
+          this.router.navigate(['/home']);
+        } else {
+          this.mostrarAlerta('Acceso denegado', 'Este usuario no está registrado como alumno.');
         }
       } catch (error) {
-        // Mostrar alerta si las credenciales son incorrectas
-        this.mostrarAlerta('Credenciales incorrectas', 'Por favor, intente de nuevo.');
+        console.error('Error en inicio de sesión de alumno:', error);
+        this.mostrarAlerta('Error de inicio de sesión', 'Credenciales incorrectas. Intente nuevamente.');
       }
     } else {
       // Sin conexión: intentar cargar usuario desde almacenamiento local
-      const localUser = await this.authService.getUserFromLocalStorage();
+      const localUser = await this.authService.getUserFromLocalStorage(this.usr.email);
       
-      if (localUser && localUser.email === this.usr.email && localUser.tipo === 'alumno') {
+      if (localUser && localUser.email === this.usr.email && localUser.password === this.usr.password && localUser.tipo === 'alumno') {
+        console.log('Usuario local válido:', localUser);
         this.router.navigate(['/home']);
       } else {
+        console.log('No se encontró un usuario local válido');
         this.mostrarAlerta('Acceso sin conexión', 'No se encontraron datos locales. Inicie sesión en línea al menos una vez.');
       }
     }
