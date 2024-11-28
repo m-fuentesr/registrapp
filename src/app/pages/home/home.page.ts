@@ -1,16 +1,27 @@
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
+import { Barcode, BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
+import { AlertController } from '@ionic/angular';
+import { Storage } from '@ionic/storage-angular';
+import { Network } from '@capacitor/network';
 
 @Component({
   selector: 'app-home',
   templateUrl: './home.page.html',
   styleUrls: ['./home.page.scss'],
 })
-export class HomePage implements OnInit {
 
-  asignaturas: any[] = []
+export class HomePage implements OnInit {
+  isSupported = false;
+  alumnoId: string = '';
+  asignaturas: any[] = [];
+  secciones: any = {};
+  barcodes: Barcode[] = [];
+  isScanning: boolean = false;
 
   profileMenuButtons = [
     {
@@ -33,52 +44,324 @@ export class HomePage implements OnInit {
       role: 'cancel'
     }
   ];
-  
 
   constructor(
-    private router : Router,
+    private router: Router,
     private firestore: AngularFirestore,
-    private afAuth: AngularFireAuth) { }
+    private afAuth: AngularFireAuth,
+    private storage: Storage,
+    private route: ActivatedRoute,
+    private alertController: AlertController
+  ) { }
 
-  ngOnInit() {
-    this.obtenerAsignaturas();
+  async ngOnInit() {
+    await this.initStorage();
+    this.checkBarcodeScannerSupport();
+
+    this.afAuth.authState.subscribe((user) => {
+      if (user) {
+        this.alumnoId = user.uid;
+        this.obtenerAsignaturasYSecciones();
+        this.sincronizarDatosOffline();
+      }
+    });
+
+    Network.addListener('networkStatusChange', () => {
+      this.sincronizarDatosOffline();
+    });
   }
 
-  obtenerAsignaturas() {
-    this.afAuth.currentUser.then(user => {
-      if (user) {
-        const alumnoId = user.uid;
-        this.firestore.collection('asignaturas').snapshotChanges().subscribe((data: any) => {
-          console.log('Todas las asignaturas:', data);
+  private async initStorage() {
+    await this.storage.create();
+  }
 
-          this.asignaturas = data
-            .map((e: any) => {
-              const asignatura = e.payload.doc.data();
-              console.log('Asignatura:', asignatura);
+  async checkBarcodeScannerSupport() {
+    const result = await BarcodeScanner.isSupported();
+    this.isSupported = result.supported;
+    if (this.isSupported) {
+      await BarcodeScanner.installGoogleBarcodeScannerModule();
+    }
+  }
 
-              const seccionesFiltradas = Object.keys(asignatura.secciones).filter(seccionKey => {
-                const seccion = asignatura.secciones[seccionKey];
-                return seccion.alumnos && seccion.alumnos.some((alumno: any) => alumno.alumnoId === alumnoId);
-              }).map(seccionKey => asignatura.secciones[seccionKey]);
+  async requestPermissions(): Promise<boolean> {
+    const { camera } = await BarcodeScanner.requestPermissions();
+    return camera === 'granted' || camera === 'limited';
+  }
 
-              if (seccionesFiltradas.length > 0) {
-                return {
-                  id: e.payload.doc.id,
-                  nombre: asignatura.nombre,
-                  secciones: seccionesFiltradas,
-                };
-              }
-              return null;
-            })
-            .filter((asignatura: any) => asignatura !== null);
+  async obtenerAsignaturasYSecciones() {
+    const status = await Network.getStatus();
+    if (status.connected) {
+      // Cargar asignaturas y secciones desde Firestore
+      this.firestore
+        .collection('asignaturas')
+        .valueChanges()
+        .subscribe(async (asignaturas: any[]) => {
+          this.asignaturas = asignaturas.filter((asignatura) =>
+            Object.values(asignatura.secciones || {}).some((seccion: any) =>
+              seccion.alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId)
+            )
+          );
+
+          // Guardar datos en almacenamiento local para offline
+          await this.storage.set('asignaturasOffline', this.asignaturas);
         });
+    } else {
+      // Recuperar datos desde almacenamiento local
+      const asignaturasOffline = await this.storage.get('asignaturasOffline');
+      this.asignaturas = asignaturasOffline || [];
+    }
+  }
+
+  async escanearQR() {
+    try {
+      console.log('Iniciando escaneo...');
+
+      // Verificar permisos de cámara
+      const granted = await this.requestPermissions();
+      if (!granted) {
+        await this.mostrarAlerta('Permiso denegado', 'Para usar la aplicación debe autorizar los permisos de cámara.');
+        return;
       }
-    }).catch(error => {
-      console.error("Error al obtener el usuario:", error);
+
+      this.isScanning = true;
+      console.log('Escaneando código...');
+
+      // Escanear el código QR
+      const { barcodes } = await BarcodeScanner.scan();
+      this.barcodes.push(...barcodes);  // Almacenar los códigos escaneados
+      console.log('Códigos detectados:', barcodes);
+
+      if (this.barcodes.length > 0 && this.barcodes[0].displayValue) {
+        const datosClase = JSON.parse(this.barcodes[0].displayValue);
+
+        console.log("Datos del código QR:", JSON.stringify(datosClase));
+
+        // Validar si la clase escaneada corresponde con la asignatura y sección
+        if (await this.validarClase(datosClase)) {
+          // Si la clase es válida, registrar asistencia
+          await this.registrarAsistencia(datosClase);
+          await this.mostrarAlerta('Éxito', 'Asistencia registrada correctamente.');
+        } else {
+          // Si la clase no es válida para el alumno, registrar al alumno en la asignatura y sección
+          await this.registrarAlumnoEnAsignatura(datosClase);
+          // Además, registrar la asistencia en el mismo paso
+          await this.registrarAsistencia(datosClase);
+          await this.mostrarAlerta('Éxito', 'Te has registrado en la asignatura y la asistencia ha sido registrada.');
+        }
+      } else {
+        await this.mostrarAlerta('Error', 'No se detectó ningún código QR válido.');
+      }
+    } catch (error) {
+      console.error('Error al escanear el código QR:', error);
+      await this.mostrarAlerta('Error', 'Ocurrió un error al escanear.');
+    } finally {
+      this.isScanning = false;
+    }
+  }
+
+  private async validarClase(datosClase: any): Promise<boolean> {
+    // Buscar la asignatura en Firestore usando el id del documento (que es 'asignatura' en el QR)
+    const asignaturaDocRef = this.firestore.collection('asignaturas').doc(datosClase.asignatura);
+    const asignaturaDoc = await asignaturaDocRef.get().toPromise();
+
+    // Verificar si la asignatura existe
+    if (!asignaturaDoc?.exists) {
+      console.log("Asignatura no encontrada");
+      return false;
+    }
+
+    const asignaturaData = asignaturaDoc.data() as any;
+
+    // Verificar que la asignatura tiene secciones
+    if (typeof asignaturaData.secciones !== 'object') {
+      console.log("No se encontraron secciones en la asignatura");
+      return false;
+    }
+
+    // Buscar la sección en la asignatura
+    const seccion = asignaturaData.secciones[datosClase.seccion];
+    if (!seccion) {
+      console.log("Sección no encontrada");
+      return false;
+    }
+
+    // Verificar si el alumno está registrado en la sección
+    const alumnoRegistrado = seccion.alumnos?.some(
+      (alumno: any) => alumno.alumnoId === this.alumnoId
+    );
+    if (alumnoRegistrado) {
+      // El alumno ya está registrado en la sección, validamos la clase
+      return true;
+    } else {
+      // Si el alumno no está registrado en la sección, devolvemos false
+      console.log("El alumno no está registrado en la sección");
+      return false;
+    }
+  }
+
+  private async registrarAlumnoEnAsignatura(datosClase: any) {
+    try {
+      // Obtener los datos del QR (ya contenidos en datosClase)
+      const { asignatura, seccion } = datosClase;
+      if (!asignatura || !seccion) {
+        await this.mostrarAlerta('Error', 'QR inválido: faltan datos de asignatura o sección.');
+        return;
+      }
+
+      // Buscar la asignatura en Firestore
+      const asignaturaDocRef = this.firestore.collection('asignaturas').doc(asignatura);
+      const asignaturaDoc = await asignaturaDocRef.get().toPromise();
+
+      // Verificar si la asignatura existe
+      if (!asignaturaDoc?.exists) {
+        await this.mostrarAlerta('Error', 'La asignatura especificada no existe.');
+        return;
+      }
+
+      const asignaturaData = asignaturaDoc.data() as any;
+
+      if (asignaturaData?.secciones?.[seccion]) {
+        const seccionData = asignaturaData.secciones[seccion];
+
+        // Verificar si la sección existe
+        if (!seccionData) {
+          await this.mostrarAlerta('Error', 'La sección especificada no existe en esta asignatura.');
+          return;
+        }
+
+        // Verificar si el alumno ya está registrado en la sección
+        const alumnoRegistrado = seccionData.alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId);
+        if (alumnoRegistrado) {
+          console.log('Alumno ya registrado en esta sección');
+          return;
+        }
+
+        // Registrar al alumno en la asignatura-sección
+        await asignaturaDocRef.update({
+          [`secciones.${seccion}.alumnos`]: firebase.firestore.FieldValue.arrayUnion({ alumnoId: this.alumnoId }),
+        });
+
+        // Registrar la asistencia
+        await this.registrarAsistencia(datosClase);
+
+        // Actualizar las asignaturas mostradas en el Home del alumno
+        await this.obtenerAsignaturasYSecciones();
+        await this.mostrarAlerta('Éxito', 'Te has registrado correctamente en la asignatura y sección.');
+
+      } else {
+        await this.mostrarAlerta('Error', 'No se encontraron secciones en esta asignatura.');
+      }
+    } catch (error) {
+      console.error('Error al registrar al alumno en la asignatura:', error);
+      await this.mostrarAlerta('Error', 'Ocurrió un problema al registrarte en la asignatura.');
+    }
+  }
+
+  private async registrarAsistencia(datosClase: any) {
+    try {
+      // Verificar si 'nombre' (de la clase) está presente
+      if (!datosClase.nombre) {
+        console.log('Error: Nombre de clase no encontrado en datosClase:', datosClase);
+        await this.mostrarAlerta('Error', 'Datos de clase no válidos en el QR.');
+        return;
+      }
+
+      // Verificar si la asistencia ya ha sido registrada previamente
+      const asistenciaRef = this.firestore.collection('asistencia').doc(this.alumnoId);
+      const doc = await asistenciaRef.get().toPromise();
+
+      let clasesAsistidas = 0;
+      let clasesRegistradas: string[] = [];
+      let porcentajeAsistencia = 0;
+
+      if (doc?.exists) {
+        const data = doc.data() as { clasesAsistidas: number; clasesRegistradas: string[], porcentajeAsistencia: number };
+        clasesRegistradas = data.clasesRegistradas || [];
+        clasesAsistidas = data.clasesAsistidas || 0;
+        porcentajeAsistencia = data.porcentajeAsistencia || 0;
+
+        // Verificar si la clase ya ha sido registrada
+        if (clasesRegistradas.includes(datosClase.nombre)) {
+          await this.mostrarAlerta('Asistencia ya registrada', 'Ya has registrado tu asistencia para esta clase.');
+          return;
+        }
+      }
+
+      const totalClases = clasesRegistradas.length;
+
+      await asistenciaRef.set({
+        alumnoId: this.alumnoId,
+        clasesRegistradas: firebase.firestore.FieldValue.arrayUnion(datosClase.nombre),
+        clasesAsistidas: clasesAsistidas + 1,
+        porcentajeAsistencia: (clasesAsistidas/totalClases) * 100,
+      }, { merge: true });
+
+      const mensajeConfirmacion = `
+      Clase: ${datosClase.nombre}
+      Asignatura: ${datosClase.asignaturaNombre}
+      Sección: ${datosClase.seccion}
+      Fecha: ${datosClase.fecha}
+    `;
+
+      console.log('Asistencia registrada correctamente para la clase:', datosClase.nombre);
+      await this.mostrarAlerta('¡Asistencia registrada!', mensajeConfirmacion);
+    } catch (error) {
+      console.error('Error al registrar asistencia:', error);
+      await this.mostrarAlerta('Error', 'Ocurrió un problema al registrar la asistencia.');
+    }
+  }
+
+  async sincronizarDatosOffline() {
+    const status = await Network.getStatus();
+    if (!status.connected) return;
+
+    const asistenciasOffline = (await this.storage.get('asistenciasOffline')) || [];
+    if (asistenciasOffline.length > 0) {
+      for (const asistencia of asistenciasOffline) {
+        const asistenciaDocRef = this.firestore
+          .collection('asistencia')
+          .doc(`${asistencia.alumnoId}_${asistencia.fecha}`);
+        const asistenciaDoc = await asistenciaDocRef.get().toPromise();
+
+        let clasesAsistidas = 0;
+        let clasesRegistradas: string[] = [];
+        let porcentajeAsistencia = 0;
+
+        // Si ya existe el documento, recuperamos la información de clases y porcentaje de asistencia
+        if (asistenciaDoc?.exists) {
+          const data = asistenciaDoc.data() as { clasesAsistidas: number; clasesRegistradas: string[], porcentajeAsistencia: number };
+          clasesRegistradas = data.clasesRegistradas || [];
+          clasesAsistidas = data.clasesAsistidas || 0;
+          porcentajeAsistencia = data.porcentajeAsistencia || 0;
+        }
+
+        const totalClases = clasesRegistradas.length + 1; // Nueva clase registrada
+
+        await asistenciaDocRef.set({
+          alumnoId: asistencia.alumnoId,
+          fecha: asistencia.fecha,
+          clasesRegistradas: firebase.firestore.FieldValue.arrayUnion(asistencia.clase.nombre),
+          clasesAsistidas: clasesAsistidas + 1,
+          porcentajeAsistencia: (clasesAsistidas/totalClases) * 100,
+        }, { merge: true });
+
+        // Limpiar asistencias sincronizadas
+        await this.storage.remove('asistenciasOffline');
+      }
+    }
+  }
+
+  async mostrarAlerta(titulo: string, mensaje: string) {
+    const alert = await this.alertController.create({
+      header: titulo,
+      message: mensaje,
+      buttons: ['OK'],
     });
+    await alert.present();
   }
 
   navegarASeccion(asignaturaId: string, seccion: any) {
     this.router.navigate(['/asignaturas'], { queryParams: { asignaturaId, seccion: seccion.nombre } });
   }
 }
+

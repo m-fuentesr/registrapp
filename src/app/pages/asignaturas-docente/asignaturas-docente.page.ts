@@ -162,6 +162,7 @@ export class AsignaturasDocentePage implements OnInit {
                   alumno.porcentajeAsistencia = asistencia.porcentajeAsistencia || 0;
                 }
               });
+              this.cdr.detectChanges();
             });
           });
         }
@@ -198,6 +199,7 @@ export class AsignaturasDocentePage implements OnInit {
     const nombreClase = `Clase ${this.clasesGeneradas.length + 1}`;
     const datosClase = {
       asignatura: this.asignaturaId,
+      asignaturaNombre: this.asignaturaNombre,
       seccion: this.seccion?.nombre,
       nombre: nombreClase,
       fecha: fechaActual,

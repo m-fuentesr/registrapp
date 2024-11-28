@@ -8,16 +8,19 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-router-outlet id="main-content"></ion-router-outlet>
-
-<ion-action-sheet trigger="perfilMenu" backdropDismiss="false" [buttons]="profileMenuButtons" mode="ios"></ion-action-sheet>
-
 <ion-content class="ion-padding">
+  <ion-action-sheet trigger="perfilMenu" backdropDismiss="false" [buttons]="profileMenuButtons" mode="ios"></ion-action-sheet>
+
   <ion-text color="primary" class="ion-text-center">
-    <h1>Lista de asignaturas</h1>
+    <h1>Mis Asignaturas</h1>
   </ion-text>
 
-  <ion-accordion-group expand="inset" lines="none" mode="ios">
+  <!-- Mostrar mensaje si no hay asignaturas -->
+  <ion-text *ngIf="asignaturas.length === 0" class="ion-text-center">
+    <p>No estás inscrito en ninguna asignatura. Escanea un QR para registrarte.</p>
+  </ion-text>
+
+  <ion-accordion-group *ngIf="asignaturas.length > 0" expand="inset" lines="none" mode="ios">
     <ion-accordion *ngFor="let asignatura of asignaturas">
       <ion-item slot="header" detail="false">
         <ion-icon name="laptop-outline" slot="start"></ion-icon>
@@ -31,4 +34,10 @@
     </ion-accordion>
   </ion-accordion-group>
 
+  <!-- Botón para escanear QR -->
+  <div class="boton-asistencia">
+    <ion-button (click)="escanearQR()" expand="block" color="primary">
+      Escanear QR
+    </ion-button>
+  </div>
 </ion-content>
