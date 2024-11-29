@@ -1,15 +1,15 @@
 <app-encabezado titulo="Clase actual"></app-encabezado>
 
 <ion-content>
-  <ion-list *ngIf="alumnosPresentes.length > 0">
+  <ion-list *ngIf=" alumnosPresentes.length > 0">
     <ion-item *ngFor="let alumno of alumnosPresentes">
       <ion-label>
-        <h2>{{ alumno.nombre }}</h2>
-        <p>Fecha: {{ alumno.fecha }}</p>
+        <h2>{{ alumno.firstName }} {{ alumno.lastName }}</h2>
+        <p>Presente.</p>
       </ion-label>
     </ion-item>
   </ion-list>
-  <ion-item *ngIf="alumnosPresentes.length === 0">
+  <ion-item *ngIf=" alumnosPresentes.length === 0">
     <ion-label>No hay alumnos presentes para esta clase.</ion-label>
   </ion-item>
 </ion-content>

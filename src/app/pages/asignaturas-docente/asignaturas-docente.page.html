@@ -43,7 +43,10 @@
     <p>Escanee este código para marcar asistencia.</p>
   </div>
 
-  <ion-button expand="block" routerLink="/clase-actual" [queryParams]="{ claseSeleccionada: claseSeleccionada, asignaturaId: asignaturaId }" [disabled]="!claseSeleccionada" fill="solid" color="primary">
+  <ion-button expand="block" routerLink="/clase-actual" [queryParams]="{ 
+    claseSeleccionada: claseSeleccionada?.nombre, asignaturaId: asignaturaId, seccion: seccion.nombre }" 
+    [disabled]="!claseSeleccionada" fill="solid" color="primary">
     Ver Clase Actual
   </ion-button>
+
 </ion-content>
