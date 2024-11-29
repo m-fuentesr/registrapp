@@ -142,7 +142,7 @@ export class HomePage implements OnInit {
           await this.registrarAsistencia(datosClase);
           await this.mostrarAlerta('Éxito', 'Asistencia registrada correctamente.');
         } else {
-          // Si la clase no es válida para el alumno, registrar al alumno en la asignatura y sección
+          // Si es la primera vez que escanea, registrar al alumno en la asignatura y sección
           await this.registrarAlumnoEnAsignatura(datosClase);
           // Además, registrar la asistencia en el mismo paso
           await this.registrarAsistencia(datosClase);
@@ -246,8 +246,6 @@ export class HomePage implements OnInit {
 
         // Actualizar las asignaturas mostradas en el Home del alumno
         await this.obtenerAsignaturasYSecciones();
-        await this.mostrarAlerta('Éxito', 'Te has registrado correctamente en la asignatura y sección.');
-
       } else {
         await this.mostrarAlerta('Error', 'No se encontraron secciones en esta asignatura.');
       }
@@ -259,8 +257,8 @@ export class HomePage implements OnInit {
 
   private async registrarAsistencia(datosClase: any) {
     try {
-      // Verificar si 'nombre' (de la clase) está presente
-      if (!datosClase.nombre) {
+      if (!datosClase.nombre || !datosClase.asignatura || !datosClase.seccion
+        || !datosClase.asignaturaNombre || !datosClase.fecha ) {
         console.log('Error: Nombre de clase no encontrado en datosClase:', datosClase);
         await this.mostrarAlerta('Error', 'Datos de clase no válidos en el QR.');
         return;
@@ -270,34 +268,48 @@ export class HomePage implements OnInit {
       const asistenciaRef = this.firestore.collection('asistencia').doc(this.alumnoId);
       const doc = await asistenciaRef.get().toPromise();
 
-      let clasesAsistidas = 0;
-      let clasesRegistradas: string[] = [];
-      let porcentajeAsistencia = 0;
+      let clasesAsistidas: { asignaturaId: string; seccion: string; nombre: string; 
+        asignaturaNombre: string; fecha: string} [] = [];
 
       if (doc?.exists) {
-        const data = doc.data() as { clasesAsistidas: number; clasesRegistradas: string[], porcentajeAsistencia: number };
-        clasesRegistradas = data.clasesRegistradas || [];
-        clasesAsistidas = data.clasesAsistidas || 0;
-        porcentajeAsistencia = data.porcentajeAsistencia || 0;
+        const data = doc.data() as {
+          clasesAsistidas: { asignaturaId: string; seccion: string; nombre: string;
+            asignaturaNombre: string; fecha:string;}[]
+        };
+        clasesAsistidas = data.clasesAsistidas || [];
 
-        // Verificar si la clase ya ha sido registrada
-        if (clasesRegistradas.includes(datosClase.nombre)) {
-          await this.mostrarAlerta('Asistencia ya registrada', 'Ya has registrado tu asistencia para esta clase.');
-          return;
-        }
+      }
+      console.log("Clases asistidas:", clasesAsistidas);
+
+      // Verificar si la clase ya está registrada
+      const claseYaAsistida = clasesAsistidas.some(
+        (clase) => clase.nombre === datosClase.nombre &&
+          clase.asignaturaId === datosClase.asignatura &&
+          clase.seccion === datosClase.seccion &&
+          clase.asignaturaNombre === datosClase.asignaturaNombre &&
+          clase.fecha === datosClase.fecha
+      );
+
+      console.log('Clase ya asistida:', claseYaAsistida);
+
+      if (claseYaAsistida) {
+        await this.mostrarAlerta(
+          'Asistencia ya registrada',
+          `Ya has registrado tu asistencia para la clase "${datosClase.nombre}" en esta asignatura y sección.`
+        );
+        return;
       }
 
-      const totalClases = clasesRegistradas.length;
+      // Registrar nueva clase asistida
+      clasesAsistidas.push({ asignaturaId: datosClase.asignatura, seccion: datosClase.seccion, nombre: datosClase.nombre,
+        asignaturaNombre: datosClase.asignaturaNombre, fecha: datosClase.fecha});
 
       await asistenciaRef.set({
         alumnoId: this.alumnoId,
-        clasesRegistradas: firebase.firestore.FieldValue.arrayUnion(datosClase.nombre),
-        clasesAsistidas: clasesAsistidas + 1,
-        porcentajeAsistencia: (clasesAsistidas/totalClases) * 100,
-      }, { merge: true });
+        clasesAsistidas }, { merge: true });
 
       const mensajeConfirmacion = `
-      Clase: ${datosClase.nombre}
+      ${datosClase.nombre}
       Asignatura: ${datosClase.asignaturaNombre}
       Sección: ${datosClase.seccion}
       Fecha: ${datosClase.fecha}
@@ -325,24 +337,23 @@ export class HomePage implements OnInit {
 
         let clasesAsistidas = 0;
         let clasesRegistradas: string[] = [];
-        let porcentajeAsistencia = 0;
 
         // Si ya existe el documento, recuperamos la información de clases y porcentaje de asistencia
         if (asistenciaDoc?.exists) {
           const data = asistenciaDoc.data() as { clasesAsistidas: number; clasesRegistradas: string[], porcentajeAsistencia: number };
           clasesRegistradas = data.clasesRegistradas || [];
           clasesAsistidas = data.clasesAsistidas || 0;
-          porcentajeAsistencia = data.porcentajeAsistencia || 0;
         }
 
         const totalClases = clasesRegistradas.length + 1; // Nueva clase registrada
+        const nuevoPorcentajeAsistencia = (clasesAsistidas + 1) / totalClases * 100;
 
         await asistenciaDocRef.set({
           alumnoId: asistencia.alumnoId,
           fecha: asistencia.fecha,
           clasesRegistradas: firebase.firestore.FieldValue.arrayUnion(asistencia.clase.nombre),
           clasesAsistidas: clasesAsistidas + 1,
-          porcentajeAsistencia: (clasesAsistidas/totalClases) * 100,
+          porcentajeAsistencia: nuevoPorcentajeAsistencia
         }, { merge: true });
 
         // Limpiar asistencias sincronizadas

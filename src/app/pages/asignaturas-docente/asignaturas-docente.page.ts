@@ -120,27 +120,26 @@ export class AsignaturasDocentePage implements OnInit {
             this.totalClases = 0;
           }
         });
-      } else {
-        // Recuperar clases desde almacenamiento local si no hay conexión
-        try {
-          const seccionOffline = await this.storage.get('seccionOffline');
-          if (seccionOffline) {
-            this.clasesGeneradas = seccionOffline.clases || [];
-            this.totalClases = this.clasesGeneradas.length;
-            console.log('Clases generadas desde almacenamiento local:', this.clasesGeneradas);
-          } else {
-            this.clasesGeneradas = [];
-            this.totalClases = 0;
-            console.log('No hay clases almacenadas offline.');
-          }
-        } catch (error) {
-          console.error('Error al obtener clases offline:', error);
+    } else {
+      // Recuperar clases desde almacenamiento local si no hay conexión
+      try {
+        const seccionOffline = await this.storage.get('seccionOffline');
+        if (seccionOffline) {
+          this.clasesGeneradas = seccionOffline.clases || [];
+          this.totalClases = this.clasesGeneradas.length;
+          console.log('Clases generadas desde almacenamiento local:', this.clasesGeneradas);
+        } else {
           this.clasesGeneradas = [];
           this.totalClases = 0;
+          console.log('No hay clases almacenadas offline.');
         }
+      } catch (error) {
+        console.error('Error al obtener clases offline:', error);
+        this.clasesGeneradas = [];
+        this.totalClases = 0;
       }
     }
-
+  }
 
   obtenerAlumnos() {
     this.firestore
@@ -157,9 +156,21 @@ export class AsignaturasDocentePage implements OnInit {
             this.firestore.collection('asistencia').valueChanges().subscribe((asistencias: any[]) => {
               this.alumnos.forEach(alumno => {
                 const asistencia = asistencias.find(a => a.alumnoId === alumno.alumnoId);
-                if (asistencia) {
-                  alumno.clasesAsistidas = asistencia.clasesAsistidas || 0;
-                  alumno.porcentajeAsistencia = asistencia.porcentajeAsistencia || 0;
+                if (asistencia && asistencia.clasesAsistidas) {
+                  const totalClases = this.totalClases || 0;
+                  const clasesAsistidas = asistencia.clasesAsistidas.filter(
+                    (clase: any) =>
+                      clase.asignaturaId === this.asignaturaId &&
+                      clase.seccion === this.seccion.nombre
+                  );
+
+                  alumno.clasesAsistidas = clasesAsistidas.length;
+                  alumno.porcentajeAsistencia = totalClases > 0
+                    ? (alumno.clasesAsistidas / totalClases) * 100
+                    : 0;
+                } else {
+                  alumno.clasesAsistidas = 0;
+                  alumno.porcentajeAsistencia = 0;
                 }
               });
               this.cdr.detectChanges();
