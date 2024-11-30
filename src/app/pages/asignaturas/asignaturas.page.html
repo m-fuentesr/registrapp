@@ -1,25 +1,21 @@
-<app-encabezado titulo="Asignatura"></app-encabezado>
+<app-encabezado titulo="Clases asistidas"></app-encabezado>
 
-<ion-content class="ion-padding">
-  <ion-item>
-    <ion-label>
-      <h1>{{ asignaturaNombre }}</h1>
-      <p>Profesor: {{profesorNombre}}</p>
-    </ion-label>
-  </ion-item>
+<ion-content>
+  <ion-card>
+    <ion-card-content>
+      <p><strong>Clases asistidas:</strong> {{ clasesAsistidas.length }} de {{ totalClases }}</p>
+      <p><strong>Porcentaje de asistencia:</strong> {{ totalClases > 0 ? ((clasesAsistidas.length / totalClases) * 100) : 0 | number:'1.0-0' }}%</p>
+    </ion-card-content>
+  </ion-card>
 
-  <ion-item *ngIf="asistenciaConfirmada">
-    <ion-label>
-      <h1>Asistencia Confirmada</h1>
-      <p>{{ claseNombre }}</p>
-      <p>Fecha y hora: {{ fechaHoraActual }}</p>
-      <p>Ubicación: Latitud {{ latitud }}, Longitud {{ longitud }}</p>
-    </ion-label>
-  </ion-item>
-
-  <div class="boton-asistencia">
-    <ion-button (click)="registrarAsistencia()" expand="block">
-      Registrar asistencia
-    </ion-button>
-  </div>
+  <ion-card *ngFor="let clase of clasesAsistidas">
+    <ion-card-header>
+      <ion-card-title>{{ clase.nombre }}</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <p><strong>Asignatura:</strong> {{ clase.asignaturaNombre }}</p>
+      <p><strong>Sección:</strong> {{ clase.seccion }}</p>
+      <p><strong>Fecha:</strong> {{ clase.fecha }}</p>
+    </ion-card-content>
+  </ion-card>
 </ion-content>

@@ -94,13 +94,18 @@ export class HomePage implements OnInit {
       // Cargar asignaturas y secciones desde Firestore
       this.firestore
         .collection('asignaturas')
-        .valueChanges()
-        .subscribe(async (asignaturas: any[]) => {
-          this.asignaturas = asignaturas.filter((asignatura) =>
-            Object.values(asignatura.secciones || {}).some((seccion: any) =>
-              seccion.alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId)
-            )
-          );
+        .snapshotChanges()
+        .subscribe(async (snapshot) => {
+          this.asignaturas = snapshot
+            .map((doc: any) => ({
+              id: doc.payload.doc.id,
+              ...doc.payload.doc.data(),
+            }))
+            .filter((asignatura: any) =>
+              Object.values(asignatura.secciones || {}).some((seccion: any) =>
+                seccion.alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId)
+              )
+            );
 
           // Guardar datos en almacenamiento local para offline
           await this.storage.set('asignaturasOffline', this.asignaturas);
@@ -258,7 +263,7 @@ export class HomePage implements OnInit {
   private async registrarAsistencia(datosClase: any) {
     try {
       if (!datosClase.nombre || !datosClase.asignatura || !datosClase.seccion
-        || !datosClase.asignaturaNombre || !datosClase.fecha ) {
+        || !datosClase.asignaturaNombre || !datosClase.fecha) {
         console.log('Error: Nombre de clase no encontrado en datosClase:', datosClase);
         await this.mostrarAlerta('Error', 'Datos de clase no válidos en el QR.');
         return;
@@ -268,13 +273,17 @@ export class HomePage implements OnInit {
       const asistenciaRef = this.firestore.collection('asistencia').doc(this.alumnoId);
       const doc = await asistenciaRef.get().toPromise();
 
-      let clasesAsistidas: { asignaturaId: string; seccion: string; nombre: string; 
-        asignaturaNombre: string; fecha: string} [] = [];
+      let clasesAsistidas: {
+        asignaturaId: string; seccion: string; nombre: string;
+        asignaturaNombre: string; fecha: string
+      }[] = [];
 
       if (doc?.exists) {
         const data = doc.data() as {
-          clasesAsistidas: { asignaturaId: string; seccion: string; nombre: string;
-            asignaturaNombre: string; fecha:string;}[]
+          clasesAsistidas: {
+            asignaturaId: string; seccion: string; nombre: string;
+            asignaturaNombre: string; fecha: string;
+          }[]
         };
         clasesAsistidas = data.clasesAsistidas || [];
 
@@ -301,12 +310,15 @@ export class HomePage implements OnInit {
       }
 
       // Registrar nueva clase asistida
-      clasesAsistidas.push({ asignaturaId: datosClase.asignatura, seccion: datosClase.seccion, nombre: datosClase.nombre,
-        asignaturaNombre: datosClase.asignaturaNombre, fecha: datosClase.fecha});
+      clasesAsistidas.push({
+        asignaturaId: datosClase.asignatura, seccion: datosClase.seccion, nombre: datosClase.nombre,
+        asignaturaNombre: datosClase.asignaturaNombre, fecha: datosClase.fecha
+      });
 
       await asistenciaRef.set({
         alumnoId: this.alumnoId,
-        clasesAsistidas }, { merge: true });
+        clasesAsistidas
+      }, { merge: true });
 
       const mensajeConfirmacion = `
       ${datosClase.nombre}
@@ -371,8 +383,29 @@ export class HomePage implements OnInit {
     await alert.present();
   }
 
-  navegarASeccion(asignaturaId: string, seccion: any) {
-    this.router.navigate(['/asignaturas'], { queryParams: { asignaturaId, seccion: seccion.nombre } });
+  obtenerSeccionParaAlumno(asignatura: any): string | null {
+    const secciones = asignatura.secciones || {};
+    for (const [seccionClave, seccion] of Object.entries(secciones)) {
+      const alumnos = (seccion as any)?.alumnos;
+    if (alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId)) {
+      return seccionClave;
+    }
+  }
+    return null;
+  }
+
+  navegarASeccion(asignatura: any) {
+    const seccionEspecifica = this.obtenerSeccionParaAlumno(asignatura);
+    if (seccionEspecifica) {
+      this.router.navigate(['/asignaturas'], {
+        queryParams: {
+          asignaturaId: asignatura.id,
+          seccionEspecifica: seccionEspecifica,
+        },
+      });
+    } else {
+      console.error('No se encontró una sección para el alumno en esta asignatura');
+    }
   }
 }
 

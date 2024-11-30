@@ -17,7 +17,7 @@
     <h1>Lista de asignaturas</h1>
   </ion-text>
 
-  <ion-accordion-group expand="inset" lines="none" mode="ios">
+  <ion-accordion-group lines="none" mode="ios">
     <ion-accordion *ngFor="let asignatura of asignaturas">
       <ion-item slot="header" detail="false">
         <ion-icon name="laptop-outline" slot="start"></ion-icon>
@@ -50,8 +50,18 @@
       <ion-content>
         <form (ngSubmit)="crearAsignatura(crearAsignaturaModal)" #form="ngForm">
           <ion-item>
-            <ion-label position="floating">Nombre de la asignatura</ion-label>
-            <ion-input [(ngModel)]="nuevaAsignatura.nombre" name="nombre" required></ion-input>
+            <ion-label>Seleccionar asignatura existente (si va a agregar una nueva sección)</ion-label>
+            <ion-select [(ngModel)]="nuevaAsignatura.id" name="asignaturaId">
+              <ion-select-option [value]="null"></ion-select-option>
+              <ion-select-option *ngFor="let asignatura of asignaturas" [value]="asignatura.id">
+                {{ asignatura.nombre }}
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+  
+          <ion-item *ngIf="!nuevaAsignatura.id">
+            <ion-label position="floating">Nombre de la nueva asignatura</ion-label>
+            <ion-input [(ngModel)]="nuevaAsignatura.nombre" name="nombreAsignatura" required></ion-input>
           </ion-item>
   
           <ion-item>
@@ -59,12 +69,17 @@
             <ion-input [(ngModel)]="nuevaSeccion.nombre" name="nombreSeccion" required></ion-input>
           </ion-item>
   
-          <ion-button type="submit" expand="block" class="ion-padding" [disabled]="!form.valid">Guardar</ion-button>
+          <ion-text *ngIf="nombreSeccionDuplicado" color="danger">
+            <p>El nombre de la sección ya existe en esta asignatura.</p>
+          </ion-text>
+  
+          <ion-button type="submit" expand="block" class="ion-padding" [disabled]="!form.valid || nombreSeccionDuplicado">
+            Guardar
+          </ion-button>
         </form>
       </ion-content>
     </ng-template>
   </ion-modal>
-  
 
 </ion-content>
 
