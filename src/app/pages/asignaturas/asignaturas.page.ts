@@ -70,6 +70,7 @@ export class AsignaturasPage implements OnInit {
               fecha: clase.fecha,
             }))
           );
+          this.storage.set('clasesAsistidasOffline', this.clasesAsistidas);
         });
     } else {
       // Si no hay conexión a Internet, cargar las clases asistidas desde el almacenamiento local
@@ -92,6 +93,7 @@ export class AsignaturasPage implements OnInit {
               seccion.alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId)
             )
           );
+          this.storage.set('asignaturasOffline', this.asignaturas);
         });
     } else {
       // Si no hay conexión, intentar cargar las asignaturas desde el almacenamiento local
@@ -122,6 +124,7 @@ export class AsignaturasPage implements OnInit {
             if (seccion) {
               // Calcular el total de clases
               this.totalClases = seccion?.clases?.length || 0;
+              this.storage.set('asignaturaOffline', asignaturaData);
             } else {
               console.error('Sección no encontrada');
             }

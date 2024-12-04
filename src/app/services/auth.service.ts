@@ -60,6 +60,7 @@ export class AuthService {
             firstName: userData.firstName,
             lastName: userData.lastName,
           });
+          console.log('Usuario guardado localmente: ', userData);
           return true; // Tipo de usuario correcto
         }
       }

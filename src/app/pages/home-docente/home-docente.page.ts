@@ -104,8 +104,13 @@ export class HomeDocentePage implements OnInit {
           // Sin conexión: Cargar datos desde Ionic Storage
           this.storage.get('asignaturas').then(asignaturasOffline => {
             if (asignaturasOffline) {
+              this.asignaturas = asignaturasOffline.map((asignatura: any) => {
+                return {
+                  ...asignatura,
+                  secciones: Object.values(asignatura.secciones || {}), // Convertir a array
+                };
+              });
               console.log('Datos cargados desde almacenamiento local:', asignaturasOffline);
-              this.asignaturas = asignaturasOffline;
             } else {
               console.warn('No hay datos locales disponibles');
             }
@@ -204,19 +209,14 @@ export class HomeDocentePage implements OnInit {
                 nombre: this.nuevaSeccion.nombre,
                 docenteId: docenteId,
               };
+
             } else {
               console.warn('Asignatura no encontrada en datos offline. Creando una nueva.');
-              asignaturasOffline.push({
-                id: this.nuevaAsignatura.id,
-                nombre: this.nuevaAsignatura.nombre,
-                secciones: {
-                  [this.nuevaSeccion.nombre]: {
-                    nombre: this.nuevaSeccion.nombre,
-                    docenteId: docenteId,
-                  },
-                },
-              });
             }
+
+            this.cerrarFormularioCrear();
+            if (modal) modal.dismiss();
+
           } else {
             // Crear una nueva asignatura localmente
             const nuevaAsignaturaData = {
@@ -231,8 +231,31 @@ export class HomeDocentePage implements OnInit {
             };
             asignaturasOffline.push(nuevaAsignaturaData);
           }
+          // Guardar las asignaturas offline
           await this.storage.set('asignaturasOffline', asignaturasOffline);
-          console.log('Asignatura/Sección guardada localmente:', asignaturasOffline);
+
+          // Combinar asignaturas offline con las sincronizadas de Firestore
+          const asignaturasFirestore = await this.storage.get('asignaturas') || []; // Asignaturas previamente sincronizadas
+          const asignaturasCombinadas = [...asignaturasFirestore, ...asignaturasOffline];
+
+          // Evitar duplicados
+          const asignaturasUnicas = asignaturasCombinadas.reduce((acc: any[], current: any) => {
+            if (!acc.some(asignatura => asignatura.nombre === current.nombre)) {
+              acc.push(current);
+            }
+            return acc;
+          }, []);
+
+          // Actualizar la lista de asignaturas localmente
+          this.asignaturas = asignaturasUnicas.map(asignatura => ({
+            ...asignatura,
+            secciones: Object.values(asignatura.secciones || {}),
+          }));
+          await this.storage.set('asignaturas', this.asignaturas);
+
+          console.log('Asignaturas combinadas guardadas localmente:', this.asignaturas);
+          this.cerrarFormularioCrear();
+          if (modal) modal.dismiss();
         }
       }
     }).catch(error => {
@@ -244,9 +267,11 @@ export class HomeDocentePage implements OnInit {
     const status = await Network.getStatus();
     if (status.connected) {
       console.log('Conexión detectada. Sincronizando asignaturas...');
-      const asignaturasOffline = await this.storage.get('asignaturasOffline'); // Asignaturas no sincronizadas
 
-      if (asignaturasOffline && asignaturasOffline.length > 0) {
+      // Obtener asignaturas offline almacenadas localmente
+      const asignaturasOffline = await this.storage.get('asignaturasOffline') || [];
+
+      if (asignaturasOffline.length > 0) {
         for (const asignatura of asignaturasOffline) {
           try {
             // Verificar si la asignatura ya existe en Firestore
@@ -254,36 +279,24 @@ export class HomeDocentePage implements OnInit {
               ref.where('nombre', '==', asignatura.nombre)
             ).get().toPromise();
 
-            if (asignaturaSnapshot && asignaturaSnapshot?.docs.length > 0) {
-              // Asignatura ya existe: agregar/actualizar secciones
+            if (asignaturaSnapshot && asignaturaSnapshot.docs && asignaturaSnapshot.docs.length > 0) {
+              // Si existe, obtener su ID y combinar secciones
               const firestoreAsignatura = asignaturaSnapshot.docs[0];
               const firestoreAsignaturaId = firestoreAsignatura.id;
-
-              // Obtener los datos de Firestore
               const firestoreData = firestoreAsignatura.data();
 
-              // Comprobar si firestoreData es un objeto y contiene la propiedad 'secciones'
               if (firestoreData && typeof firestoreData === 'object' && 'secciones' in firestoreData) {
-                const firestoreSecciones = firestoreData.secciones;
-
-                // Verificar que 'firestoreSecciones' y 'asignatura.secciones' son objetos
-                if (typeof firestoreSecciones === 'object' && typeof asignatura.secciones === 'object') {
-                  // Combinar secciones offline con las de Firestore
-                  const nuevasSecciones = { ...firestoreSecciones, ...asignatura.secciones };
-
-                  // Actualizar en Firestore
-                  await this.firestore.collection('asignaturas').doc(firestoreAsignaturaId).update({
-                    secciones: nuevasSecciones,
-                  });
-                  console.log(`Asignatura "${asignatura.nombre}" actualizada con nuevas secciones.`);
-                } else {
-                  console.error('Las secciones no son objetos válidos.');
-                }
+                const firestoreSecciones = firestoreData.secciones as Record<string, any>;
+                const nuevasSecciones = { ...firestoreSecciones, ...asignatura.secciones };
+                await this.firestore.collection('asignaturas').doc(firestoreAsignaturaId).update({
+                  secciones: nuevasSecciones,
+                });
+                console.log(`Asignatura "${asignatura.nombre}" actualizada en Firestore.`);
               } else {
-                console.error('No se encontraron secciones en los datos de Firestore.');
+                console.error('Datos incorrectos al actualizar secciones en Firestore.');
               }
             } else {
-              // Asignatura no existe: crear nueva
+              // Si no existe, crear nueva asignatura
               await this.firestore.collection('asignaturas').add({
                 nombre: asignatura.nombre,
                 secciones: asignatura.secciones,
@@ -292,20 +305,24 @@ export class HomeDocentePage implements OnInit {
             }
           } catch (error) {
             console.error(`Error al sincronizar la asignatura "${asignatura.nombre}":`, error);
-            continue; // Pasar a la siguiente asignatura
+            continue; // Continuar con la siguiente asignatura
           }
         }
 
-        // Limpia las asignaturas locales después de sincronizarlas
+        // Eliminar asignaturas offline después de sincronizarlas
         await this.storage.remove('asignaturasOffline');
         console.log('Asignaturas offline sincronizadas y eliminadas localmente.');
       } else {
         console.log('No hay asignaturas offline para sincronizar.');
       }
+
+      // Actualizar lista local con datos de Firestore después de sincronizar
+      this.obtenerAsignaturas();
     } else {
       console.log('Sin conexión. Sincronización pendiente.');
     }
   }
+
 
   navegarASeccion(asignaturaId: string, seccion: any) {
     this.router.navigate(['/asignaturas-docente'], { queryParams: { asignaturaId, seccion: seccion.nombre } });

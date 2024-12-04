@@ -69,6 +69,7 @@ export class HomePage implements OnInit {
     Network.addListener('networkStatusChange', () => {
       this.sincronizarDatosOffline();
     });
+
   }
 
   private async initStorage() {
@@ -113,7 +114,15 @@ export class HomePage implements OnInit {
     } else {
       // Recuperar datos desde almacenamiento local
       const asignaturasOffline = await this.storage.get('asignaturasOffline');
-      this.asignaturas = asignaturasOffline || [];
+      if (asignaturasOffline) {
+        this.asignaturas = asignaturasOffline.filter((asignatura: any) =>
+          Object.values(asignatura.secciones || {}).some((seccion: any) =>
+            seccion.alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId)
+          )
+        );
+      } else {
+        this.asignaturas = [];
+      }
     }
   }
 
@@ -141,17 +150,23 @@ export class HomePage implements OnInit {
 
         console.log("Datos del código QR:", JSON.stringify(datosClase));
 
-        // Validar si la clase escaneada corresponde con la asignatura y sección
-        if (await this.validarClase(datosClase)) {
-          // Si la clase es válida, registrar asistencia
-          await this.registrarAsistencia(datosClase);
-          await this.mostrarAlerta('Éxito', 'Asistencia registrada correctamente.');
+        // Verificar el estado de la red
+        const status = await Network.getStatus();
+
+        if (status.connected) {
+          // Si está en línea, registrar la asistencia y la clase
+          if (await this.validarClase(datosClase)) {
+            await this.registrarAsistencia(datosClase);
+            await this.mostrarAlerta('Éxito', 'Asistencia registrada correctamente.');
+          } else {
+            await this.registrarAlumnoEnAsignatura(datosClase);
+            await this.registrarAsistencia(datosClase);
+            await this.mostrarAlerta('Éxito', 'Te has registrado en la asignatura y la asistencia ha sido registrada.');
+          }
         } else {
-          // Si es la primera vez que escanea, registrar al alumno en la asignatura y sección
-          await this.registrarAlumnoEnAsignatura(datosClase);
-          // Además, registrar la asistencia en el mismo paso
-          await this.registrarAsistencia(datosClase);
-          await this.mostrarAlerta('Éxito', 'Te has registrado en la asignatura y la asistencia ha sido registrada.');
+          // Si está offline, almacenar los datos del QR para sincronizar más tarde
+          await this.guardarQROffline(datosClase);
+          await this.mostrarAlerta('Offline', 'No estás conectado. Los datos del QR se guardaron localmente y se sincronizarán cuando tengas conexión.');
         }
       } else {
         await this.mostrarAlerta('Error', 'No se detectó ningún código QR válido.');
@@ -161,6 +176,17 @@ export class HomePage implements OnInit {
       await this.mostrarAlerta('Error', 'Ocurrió un error al escanear.');
     } finally {
       this.isScanning = false;
+    }
+  }
+
+  private async guardarQROffline(datosClase: any) {
+    try {
+      const asistenciasOffline = await this.storage.get('asistenciasOffline') || [];
+      asistenciasOffline.push(datosClase);
+      await this.storage.set('asistenciasOffline', asistenciasOffline);
+      console.log('Datos del QR guardados localmente:', datosClase);
+    } catch (error) {
+      console.error('Error al guardar datos QR offline:', error);
     }
   }
 
@@ -387,10 +413,10 @@ export class HomePage implements OnInit {
     const secciones = asignatura.secciones || {};
     for (const [seccionClave, seccion] of Object.entries(secciones)) {
       const alumnos = (seccion as any)?.alumnos;
-    if (alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId)) {
-      return seccionClave;
+      if (alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId)) {
+        return seccionClave;
+      }
     }
-  }
     return null;
   }
 

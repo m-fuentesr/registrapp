@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 import { CanActivate, ActivatedRouteSnapshot, RouterStateSnapshot, Router } from '@angular/router';
-import { Observable } from 'rxjs';
 import { AuthService } from 'src/app/services/auth.service';
 
 @Injectable({
@@ -8,21 +7,29 @@ import { AuthService } from 'src/app/services/auth.service';
 })
 export class AuthGuard implements CanActivate {
 
-  constructor(private authService: AuthService, private router: Router) {}
+  constructor(private authService: AuthService, private router: Router) { }
 
   async canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot): Promise<boolean> {
+
+    // Verificar si el usuario está autenticado en Firebase
+    const firebaseUser = await this.authService.isAuthenticated();
     
-    // Verifica si el usuario está autenticado
-    const user = await this.authService.isAuthenticated();
-    
-    if (user) {
+    if (firebaseUser) {
       return true;
-    } else {
-      // Si no está autenticado, redirige a la página de login
-      this.router.navigate(['/login']);
-      return false;
     }
+
+    // Si no está autenticado en Firebase, intentar obtener el usuario desde el almacenamiento local
+    const localUser = await this.authService.getUserFromLocalStorage('');
+    
+    if (localUser) {
+      // Si el usuario está en el almacenamiento local, considerarlo como autenticado
+      return true;
+    }
+    
+    // Si no está autenticado ni en Firebase ni en almacenamiento local, redirigir al inicio
+    this.router.navigate(['/inicio']);
+    return false;
   }
 }
