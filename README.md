@@ -8,9 +8,9 @@ Registrapp es una aplicación móvil que permite a los estudiantes registrar su 
 - **Interfaz Adaptativa:** Diseñada para ajustarse a diferentes tamaños de pantalla, brindando una experiencia óptima en cualquier dispositivo.
 
 ## Imágenes
-<img src="src/assets/Screenshot_20241216_001752_registrapp.jpg" width="500"> <img src="src/assets/Screenshot_20241216_001818_registrapp.jpg" width="500">
-<img src="src/assets/Screenshot_20241216_001824_registrapp.jpg" width="500"> <img src="src/assets/Screenshot_20241216_002501_registrapp.jpg" width="500">
-<img src="src/assets/Screenshot_20241216_002609_registrapp.jpg" width="500">
+<img src="src/assets/Screenshot_20241216_001752_registrapp.jpg" width="300"> <img src="src/assets/Screenshot_20241216_001818_registrapp.jpg" width="300">
+<img src="src/assets/Screenshot_20241216_001824_registrapp.jpg" width="300"> <img src="src/assets/Screenshot_20241216_002501_registrapp.jpg" width="300">
+<img src="src/assets/Screenshot_20241216_002609_registrapp.jpg" width="300">
 
 ## Instalación
 1. Descarga el archivo APK desde el siguiente enlace:  
