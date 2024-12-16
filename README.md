@@ -9,7 +9,7 @@ Registrapp es una aplicación móvil que permite a los estudiantes registrar su 
 
 ## Instalación
 1. Descarga el archivo APK desde el siguiente enlace:  
-   [Descargar Registrapp](https://github.com/m-fuentesr/registrapp/releases/tag/APK)
+   [Descargar Registrapp](https://github.com/m-fuentesr/registrapp/releases/tag/APK1.1)
 2. Instala el archivo APK.
 
 ## Requisitos
@@ -24,4 +24,4 @@ Registrapp es una aplicación móvil que permite a los estudiantes registrar su 
 - **Dispositivos Compatibles:**  
   Teléfonos y tabletas Android e iOS.
 
-# Aplicacion realizada por Matias Fuentes y Sebastian Monjes.
+# Aplicacion realizada por Matías Fuentes y Sebastián Monjes.
