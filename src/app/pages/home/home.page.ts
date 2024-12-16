@@ -62,12 +62,14 @@ export class HomePage implements OnInit {
       if (user) {
         this.alumnoId = user.uid;
         this.obtenerAsignaturasYSecciones();
-        this.sincronizarDatosOffline();
+        this.sincronizarAsistenciaOffline();
+        this.sincronizarRegistrosOffline();
       }
     });
 
     Network.addListener('networkStatusChange', () => {
-      this.sincronizarDatosOffline();
+      this.sincronizarAsistenciaOffline();
+      this.sincronizarRegistrosOffline();
     });
 
   }
@@ -165,9 +167,14 @@ export class HomePage implements OnInit {
           }
         } else {
           // Si está offline, almacenar los datos del QR para sincronizar más tarde
-          await this.guardarQROffline(datosClase);
-          await this.mostrarAlerta('Offline', 'No estás conectado. Los datos del QR se guardaron localmente y se sincronizarán cuando tengas conexión.');
+          const claseValida = await this.validarClaseOffline(datosClase);
+        if (claseValida) {
+          await this.registrarAsistenciaOffline(datosClase);
+          await this.mostrarAlerta('Éxito', 'Asistencia registrada sin conexión. Se sincronizará cuando se reestablezca la conexión.');
+        } else {
+          await this.mostrarAlerta('Error', 'Datos del código QR no válidos o asignatura no registrada.');
         }
+      }
       } else {
         await this.mostrarAlerta('Error', 'No se detectó ningún código QR válido.');
       }
@@ -176,17 +183,6 @@ export class HomePage implements OnInit {
       await this.mostrarAlerta('Error', 'Ocurrió un error al escanear.');
     } finally {
       this.isScanning = false;
-    }
-  }
-
-  private async guardarQROffline(datosClase: any) {
-    try {
-      const asistenciasOffline = await this.storage.get('asistenciasOffline') || [];
-      asistenciasOffline.push(datosClase);
-      await this.storage.set('asistenciasOffline', asistenciasOffline);
-      console.log('Datos del QR guardados localmente:', datosClase);
-    } catch (error) {
-      console.error('Error al guardar datos QR offline:', error);
     }
   }
 
@@ -230,55 +226,82 @@ export class HomePage implements OnInit {
     }
   }
 
+  private async validarClaseOffline(datosClase: any): Promise<boolean> {
+    const asignaturasOffline = await this.storage.get('asignaturasOffline');
+    if (!asignaturasOffline) return false;
+  
+    const asignatura = asignaturasOffline.find(
+      (a: any) => a.id === datosClase.asignatura
+    );
+    if (!asignatura) return false;
+  
+    const seccion = asignatura.secciones?.[datosClase.seccion];
+    if (!seccion) return false;
+  
+    return seccion.alumnos?.some(
+      (alumno: any) => alumno.alumnoId === this.alumnoId
+    );
+  }
+  
   private async registrarAlumnoEnAsignatura(datosClase: any) {
     try {
-      // Obtener los datos del QR (ya contenidos en datosClase)
       const { asignatura, seccion } = datosClase;
+  
       if (!asignatura || !seccion) {
         await this.mostrarAlerta('Error', 'QR inválido: faltan datos de asignatura o sección.');
         return;
       }
-
-      // Buscar la asignatura en Firestore
-      const asignaturaDocRef = this.firestore.collection('asignaturas').doc(asignatura);
-      const asignaturaDoc = await asignaturaDocRef.get().toPromise();
-
-      // Verificar si la asignatura existe
-      if (!asignaturaDoc?.exists) {
-        await this.mostrarAlerta('Error', 'La asignatura especificada no existe.');
-        return;
-      }
-
-      const asignaturaData = asignaturaDoc.data() as any;
-
-      if (asignaturaData?.secciones?.[seccion]) {
-        const seccionData = asignaturaData.secciones[seccion];
-
-        // Verificar si la sección existe
-        if (!seccionData) {
-          await this.mostrarAlerta('Error', 'La sección especificada no existe en esta asignatura.');
+  
+      if (navigator.onLine) {
+        // Modo con conexión
+        const asignaturaDocRef = this.firestore.collection('asignaturas').doc(asignatura);
+        const asignaturaDoc = await asignaturaDocRef.get().toPromise();
+  
+        if (!asignaturaDoc?.exists) {
+          await this.mostrarAlerta('Error', 'La asignatura especificada no existe.');
           return;
         }
-
-        // Verificar si el alumno ya está registrado en la sección
-        const alumnoRegistrado = seccionData.alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId);
-        if (alumnoRegistrado) {
-          console.log('Alumno ya registrado en esta sección');
-          return;
+  
+        const asignaturaData = asignaturaDoc.data() as any;
+  
+        if (asignaturaData?.secciones?.[seccion]) {
+          const seccionData = asignaturaData.secciones[seccion];
+  
+          if (!seccionData) {
+            await this.mostrarAlerta('Error', 'La sección especificada no existe en esta asignatura.');
+            return;
+          }
+  
+          const alumnoRegistrado = seccionData.alumnos?.some((alumno: any) => alumno.alumnoId === this.alumnoId);
+          if (alumnoRegistrado) {
+            console.log('Alumno ya registrado en esta sección');
+            return;
+          }
+  
+          // Registrar al alumno en Firestore
+          await asignaturaDocRef.update({
+            [`secciones.${seccion}.alumnos`]: firebase.firestore.FieldValue.arrayUnion({ alumnoId: this.alumnoId }),
+          });
+  
+          // Registrar la asistencia
+          await this.registrarAsistencia(datosClase);
+  
+          // Actualizar asignaturas en el Home
+          await this.obtenerAsignaturasYSecciones();
+        } else {
+          await this.mostrarAlerta('Error', 'No se encontraron secciones en esta asignatura.');
         }
-
-        // Registrar al alumno en la asignatura-sección
-        await asignaturaDocRef.update({
-          [`secciones.${seccion}.alumnos`]: firebase.firestore.FieldValue.arrayUnion({ alumnoId: this.alumnoId }),
-        });
-
-        // Registrar la asistencia
-        await this.registrarAsistencia(datosClase);
-
-        // Actualizar las asignaturas mostradas en el Home del alumno
-        await this.obtenerAsignaturasYSecciones();
       } else {
-        await this.mostrarAlerta('Error', 'No se encontraron secciones en esta asignatura.');
+        // Modo sin conexión: Guardar en almacenamiento local
+        const registrosOffline = await this.storage.get('registrosOffline') || [];
+        registrosOffline.push({
+          tipo: 'registro',
+          datosClase: { asignatura, seccion, alumnoId: this.alumnoId },
+        });
+        await this.storage.set('registrosOffline', registrosOffline);
+  
+        console.log('Registro guardado localmente para sincronización.');
+        await this.mostrarAlerta('Sin conexión', 'El registro se guardó localmente y se sincronizará cuando haya conexión.');
       }
     } catch (error) {
       console.error('Error al registrar al alumno en la asignatura:', error);
@@ -361,53 +384,118 @@ export class HomePage implements OnInit {
     }
   }
 
-  async sincronizarDatosOffline() {
+  private async registrarAsistenciaOffline(datosClase: any) {
+    const asistenciasOffline = (await this.storage.get('asistenciasOffline')) || [];
+    asistenciasOffline.push({
+      asignaturaId: datosClase.asignatura,
+      seccion: datosClase.seccion,
+      nombre: datosClase.nombre,
+      asignaturaNombre: datosClase.asignaturaNombre,
+      fecha: datosClase.fecha,
+    });
+  
+    await this.storage.set('asistenciasOffline', asistenciasOffline);
+    console.log('Asistencia registrada localmente:', datosClase);
+  }
+  
+
+  async sincronizarAsistenciaOffline() {
     const status = await Network.getStatus();
     if (!status.connected) return;
 
-    const asistenciasOffline = (await this.storage.get('asistenciasOffline')) || [];
+    const asistenciasOffline: {
+      asignaturaId: string;
+      seccion: string;
+      nombre: string;
+      asignaturaNombre: string;
+      fecha: string;
+    }[] = (await this.storage.get('asistenciasOffline')) || [];
+  
     if (asistenciasOffline.length > 0) {
       for (const asistencia of asistenciasOffline) {
-        const asistenciaDocRef = this.firestore
-          .collection('asistencia')
-          .doc(`${asistencia.alumnoId}_${asistencia.fecha}`);
-        const asistenciaDoc = await asistenciaDocRef.get().toPromise();
-
-        let clasesAsistidas = 0;
-        let clasesRegistradas: string[] = [];
-
-        // Si ya existe el documento, recuperamos la información de clases y porcentaje de asistencia
-        if (asistenciaDoc?.exists) {
-          const data = asistenciaDoc.data() as { clasesAsistidas: number; clasesRegistradas: string[], porcentajeAsistencia: number };
-          clasesRegistradas = data.clasesRegistradas || [];
-          clasesAsistidas = data.clasesAsistidas || 0;
+        const asistenciaRef = this.firestore.collection('asistencia').doc(this.alumnoId);
+        const doc = await asistenciaRef.get().toPromise();
+  
+        let clasesAsistidas: {
+          asignaturaId: string;
+          seccion: string;
+          nombre: string;
+          asignaturaNombre: string;
+          fecha: string;
+        }[] = [];
+  
+        if (doc?.exists) {
+          const data = doc.data() as {
+            clasesAsistidas: {
+              asignaturaId: string;
+              seccion: string;
+              nombre: string;
+              asignaturaNombre: string;
+              fecha: string;
+            }[];
+          };
+          clasesAsistidas = data.clasesAsistidas || [];
         }
-
-        const totalClases = clasesRegistradas.length + 1; // Nueva clase registrada
-        const nuevoPorcentajeAsistencia = (clasesAsistidas + 1) / totalClases * 100;
-
-        await asistenciaDocRef.set({
-          alumnoId: asistencia.alumnoId,
-          fecha: asistencia.fecha,
-          clasesRegistradas: firebase.firestore.FieldValue.arrayUnion(asistencia.clase.nombre),
-          clasesAsistidas: clasesAsistidas + 1,
-          porcentajeAsistencia: nuevoPorcentajeAsistencia
-        }, { merge: true });
-
-        // Limpiar asistencias sincronizadas
-        await this.storage.remove('asistenciasOffline');
+  
+        // Verificar si la clase ya está registrada
+        const claseYaAsistida = clasesAsistidas.some(
+          (clase) =>
+            clase.nombre === asistencia.nombre &&
+            clase.asignaturaId === asistencia.asignaturaId &&
+            clase.seccion === asistencia.seccion &&
+            clase.fecha === asistencia.fecha
+        );
+  
+        if (!claseYaAsistida) {
+          // Agregar la nueva clase asistida
+          clasesAsistidas.push(asistencia);
+        }
+  
+        // Guardar la asistencia actualizada en Firestore
+        await asistenciaRef.set(
+          {
+            alumnoId: this.alumnoId,
+            clasesAsistidas,
+          },
+          { merge: true }
+        );
       }
+  
+      // Eliminar asistencias sincronizadas del almacenamiento local
+      await this.storage.remove('asistenciasOffline');
+      console.log('Asistencias offline sincronizadas con éxito.');
     }
   }
 
-  async mostrarAlerta(titulo: string, mensaje: string) {
-    const alert = await this.alertController.create({
-      header: titulo,
-      message: mensaje,
-      buttons: ['OK'],
-    });
-    await alert.present();
+  private async sincronizarRegistrosOffline() {
+    const status = await Network.getStatus();
+    if (!status.connected) return;
+
+    try {
+      const registrosOffline = await this.storage.get('registrosOffline') || [];
+  
+      for (const registro of registrosOffline) {
+        if (registro.tipo === 'registro') {
+          const { asignatura, seccion, alumnoId } = registro.datosClase;
+  
+          const asignaturaDocRef = this.firestore.collection('asignaturas').doc(asignatura);
+  
+          await asignaturaDocRef.update({
+            [`secciones.${seccion}.alumnos`]: firebase.firestore.FieldValue.arrayUnion({ alumnoId }),
+          });
+  
+          console.log(`Registro sincronizado: ${alumnoId} en ${asignatura} - ${seccion}`);
+        }
+      }
+  
+      // Limpiar los registros locales sincronizados
+      await this.storage.remove('registrosOffline');
+      console.log('Todos los registros offline fueron sincronizados.');
+    } catch (error) {
+      console.error('Error al sincronizar registros offline:', error);
+    }
   }
+  
 
   obtenerSeccionParaAlumno(asignatura: any): string | null {
     const secciones = asignatura.secciones || {};
@@ -418,6 +506,15 @@ export class HomePage implements OnInit {
       }
     }
     return null;
+  }
+
+  async mostrarAlerta(titulo: string, mensaje: string) {
+    const alert = await this.alertController.create({
+      header: titulo,
+      message: mensaje,
+      buttons: ['OK'],
+    });
+    await alert.present();
   }
 
   navegarASeccion(asignatura: any) {

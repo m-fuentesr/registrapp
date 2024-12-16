@@ -40,17 +40,17 @@ export class RegistroPage {
   validarDatos(): boolean {
     let valid = true;
 
-    // Validación del primer nombre: comienza con mayúscula y tiene al menos 3 caracteres
-    if (!/^[A-Z][a-z]{2,}$/.test(this.usr.firstName || '')) {
-      this.errorMessages.firstName = 'El nombre debe comenzar con mayúscula y tener al menos 3 caracteres.';
+    // Validación del primer nombre: al menos un carácter
+    if (!/^[A-Z][a-z]*$/.test(this.usr.firstName || '')) {
+      this.errorMessages.firstName = 'El nombre debe tener al menos un carácter.';
       valid = false;
     } else {
       this.errorMessages.firstName = '';
     }
 
-    // Validación del apellido: comienza con mayúscula y tiene al menos 3 caracteres
-    if (!/^[A-Z][a-z]{2,}$/.test(this.usr.lastName || '')) {
-      this.errorMessages.lastName = 'El apellido debe comenzar con mayúscula y tener al menos 3 caracteres.';
+    // Validación del apellido: al menos un carácter
+    if (!/^[A-Z][a-z]*$/.test(this.usr.lastName || '')) {
+      this.errorMessages.lastName = 'El apellido debe tener al menos un carácter.';
       valid = false;
     } else {
       this.errorMessages.lastName = '';
@@ -82,6 +82,12 @@ export class RegistroPage {
     }
 
     return valid;
+  }
+
+  capitalizarPrimeraLetra(campo: string): void {
+    if (this.usr[campo] && this.usr[campo].length > 0) {
+      this.usr[campo] = this.usr[campo].charAt(0).toUpperCase() + this.usr[campo].slice(1);
+    }
   }
 
   // Método para registrar el usuario

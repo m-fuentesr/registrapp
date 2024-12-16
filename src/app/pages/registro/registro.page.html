@@ -35,7 +35,7 @@
       </ion-item>
 
       <ion-item>
-        <ion-input label="Nombre" type="text" required labelPlacement="floating" name="usr.firstName" [(ngModel)]="usr.firstName" placeholder="Ingrese su nombre"></ion-input>
+        <ion-input label="Nombre" type="text" required labelPlacement="floating" name="usr.firstName" [(ngModel)]="usr.firstName" (input)="capitalizarPrimeraLetra('firstName')" placeholder="Ingrese su nombre"></ion-input>
         <ion-icon name="person"></ion-icon>
       </ion-item>
       <ion-text color="danger" *ngIf="errorMessages.firstName">
@@ -43,7 +43,7 @@
       </ion-text>
 
       <ion-item>
-        <ion-input label="Apellido" type="text" required labelPlacement="floating" name="usr.lastName" [(ngModel)]="usr.lastName" placeholder="Ingrese su apellido"></ion-input>
+        <ion-input label="Apellido" type="text" required labelPlacement="floating" name="usr.lastName" [(ngModel)]="usr.lastName" (input)="capitalizarPrimeraLetra('lastName')" placeholder="Ingrese su apellido"></ion-input>
         <ion-icon name="person"></ion-icon>
       </ion-item>
       <ion-text color="danger" *ngIf="errorMessages.lastName">
